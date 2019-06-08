@@ -20,19 +20,21 @@ endif::[]
 
 DCR is a small standalone web app designed to help debugging the environment of orchestred containers, through a very small Rust app.
 
-CAUTION: this project is in very ealry stage. It is just a way for me to learn Rust. If you feel this kind of tool can be usefull for you, please see https://github.com/DBuret/gse[GSE] that has the same purprose, with all features working (GSE is a golang version of DCR)
+CAUTION: this project is in very early stage. Many features are not implemented yet. It is just a way for me to learn Rust. 
+
+TIP: If you feel this kind of tool can be usefull for you, please see https://github.com/DBuret/gse[GSE] that has the same purprose, with all features working (GSE is a golang version of DCR)
 
 .DCR will offers the follwing endpoints
-* [x] displays its env and the details of the http request it received
+* [x] *displays its env* and the details of the http request it received
 ** usefull to understand what env and request your containers receive
 ** Display of the payload of PUT/POST request is not implemented yet
-* [x] healthcheck that can also be turned in ok or ko state through a simple http call
+* [x] *healthcheck* that can also be turned in ok or ko state through a simple http call
 ** usefull to play with your container orchestrator (kubernetes, nomad...) routing system.
-* [ ] logger to output what you want on the log output
-** usefull to test your that log gathering system
+* [ ] *logger* to output what you want on the log output
+** usefull to test your log gathering system
 ** Not implemented yat
-* [x] version display 
-** stamp is not implemented yet
+* [x] *version display* 
+** usefull to follow rolling updates
 
 == Endpoints
 
@@ -68,8 +70,6 @@ CAUTION: this project is in very ealry stage. It is just a way for me to learn R
 
 === logger
 WARNING: This endpoint is not activated by default since input sanitization is crappy. Use at your own risk
-
-NOTE: sanitization will remove *all* characters from input except `0-9A-Za-z{}:,[]`
 
 *  `/DCR/logger` is an HTTP `POST` or `PUT` endpoint that will write to stdout the payload of the POST request
 * answer: HTTP 200 status, content will be the text string _data ingested._ 
