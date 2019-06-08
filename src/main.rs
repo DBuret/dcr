@@ -3,16 +3,36 @@ extern crate log;
 extern crate actix_web;
 extern crate env_logger;
 
-
+use actix_web::error::ErrorBadRequest;
 use actix_web::http::{header, Method, StatusCode};
 use actix_web::{
-    error, guard, middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer, Result,
+    dev, error, guard, middleware, web, App, Error, FromRequest, HttpRequest, HttpResponse,
+    HttpServer, Result,
 };
+use futures::{Future, Stream};
+use rand;
+use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{env, io};
-const DCR_VERSION: &str = "0.1";
 
+const DCR_VERSION: &str = "0.1";
 static HEALTH: AtomicBool = AtomicBool::new(true);
+
+/// debug handler
+fn debug_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error> {
+    debug!("entering debug zone");
+    body.map_err(Error::from)
+        .fold(web::BytesMut::new(), move |mut body, chunk| {
+            body.extend_from_slice(&chunk);
+            Ok::<_, Error>(body)
+        })
+        .and_then(|body| {
+            format!("Body {:?}!", body);
+            Ok(HttpResponse::Ok().finish())
+        })
+
+}
+
 
 fn main() -> io::Result<()> {
     // logger init
@@ -55,6 +75,7 @@ fn main() -> io::Result<()> {
                     .route(web::post().to(logger_handler)),
             )
             .service(web::resource(&path_version).route(web::get().to(version_handler)))
+            .service(web::resource("/debug").route(web::route().to_async(debug_handler)))
             .service(web::resource(&dcr_basepath).route(web::route().to(main_handler)))
             // default
             .default_service(
