@@ -7,7 +7,7 @@ COPY --from=upx /usr/bin/upx /usr/bin/upx
 
 # install rust
 # ENV RUST_VERSION 1.35
-ENV RUST_VERSION stable
+ENV RUST stable
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain ${RUST_VERSION}
 
 #setup rust working env
@@ -35,30 +35,4 @@ ENV OPENSSL_STATIC 1
 # compile 
 ENV PKG_CONFIG_ALLOW_CROSS 1
 
-# could move to another stage here...
-
-WORKDIR /source
-COPY ./ ./
-ENV PKG_CONFIG_ALLOW_CROSS=1
-RUN cargo build --target x86_64-unknown-linux-musl --release
-
-# !!!! put your binary name here
-RUN  /usr/bin/upx target/x86_64-unknown-linux-musl/release/dcr
-
-#display result of build stage
-RUN ls -al target/x86_64-unknown-linux-musl/release
-
-## move to final image creation
-FROM scratch
-LABEL version="0.1"
-LABEL link="https://github.com/DBuret/dcr"
-LABEL description="Debug Containers with Rust - micro HTTP service to help understanding container orchestrators environment"
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY --from=builder /source/target/x86_64-unknown-linux-musl/release/dcr /
-RUN mkdir -p /static
-COPY --from=builder /source/static  /static
-
-ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-ENV SSL_CERT_DIR=/etc/ssl/certs
-
-CMD ["/dcr"]
+CMD ["/bin/bash"]

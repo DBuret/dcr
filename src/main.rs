@@ -19,14 +19,14 @@ const DCR_VERSION: &str = "0.1";
 static HEALTH: AtomicBool = AtomicBool::new(true);
 
 /// debug handler
-fn debug_handler(body: web::Payload) ->  HttpResponse {
+fn debug_handler(body: web::Payload) -> HttpResponse {
     debug!("entering debug zone");
 
+    // add here the reading of the body stream
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body(body::BodyStream)
+        .body("display of payload not yet implemented")
 }
-
 
 fn main() -> io::Result<()> {
     // logger init
