@@ -10,8 +10,11 @@ use actix_web::http::{header, Method, StatusCode};
 use actix_web::{
     error, guard, middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer, Result,
 };
+use std::sync::atomic::{AtomicBool, Ordering};
 
 const DCR_VERSION: &str = "0.1";
+
+static HEALTH: AtomicBool = AtomicBool::new(true);
 
 fn main() -> io::Result<()> {
     // logger init
@@ -27,6 +30,8 @@ fn main() -> io::Result<()> {
 
     let sys = actix_rt::System::new("dcr");
 
+    HEALTH.store(true, Ordering::Relaxed);
+
     // server
     HttpServer::new(|| {
         App::new()
@@ -34,17 +39,16 @@ fn main() -> io::Result<()> {
             .wrap(middleware::Logger::default())
             .service(web::resource("/{dcr_basepath}/health").route(web::get().to(health_handler)))
             .service(
-                web::resource("/{dcr_basepath}/health").route(web::put().to(health_toggle_handler)),
-            )
-            .service(
-                web::resource("/{dcr_basepath}/health")
-                    .route(web::post().to(health_toggle_handler)),
+                web::resource("/{dcr_basepath}/health").route(
+                    web::route()
+                        .guard(guard::Any(guard::Post()).or(guard::Put()))
+                        .to(health_toggle_handler),
+                ),
             )
             .service(web::resource("/{dcr_basepath}/version").route(web::get().to(version_handler)))
             .service(web::resource("/{dcr_basepath}/logger").route(web::put().to(logger_handler)))
             .service(web::resource("/{dcr_basepath}/logger").route(web::post().to(logger_handler)))
-            .service(web::resource("/{dcr_basepath}/").route(web::get().to(main_handler)))
-            .service(web::resource("/{dcr_basepath}").route(web::get().to(main_handler)))
+            .service(web::resource("/{dcr_basepath}").route(web::route().to(main_handler)))
             // default
             .default_service(
                 // 404 for GET request
@@ -109,15 +113,25 @@ fn main_handler(req: HttpRequest) -> HttpResponse {
 }
 
 fn health_handler(req: HttpRequest) -> HttpResponse {
-    HttpResponse::build(StatusCode::OK)
-        .content_type("text/html; charset=utf-8")
-        .body("I'm alive")
+
+    if HEALTH.load(Ordering::Relaxed) {
+        HttpResponse::build(StatusCode::OK)
+            .content_type("text/html; charset=utf-8")
+            .body("OK")
+    } else {
+        HttpResponse::build(StatusCode::SERVICE_UNAVAILABLE)
+            .content_type("text/html; charset=utf-8")
+            .body("KO")
+    }
+
 }
 
 fn health_toggle_handler(req: HttpRequest) -> HttpResponse {
+    let hc = HEALTH.load(Ordering::Relaxed);
+    HEALTH.store(!hc, Ordering::Relaxed);
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body("health toggle handler")
+        .body(format!("healthcheck toggled to {} state", !hc))
 }
 
 fn version_handler(req: HttpRequest, dcr_stamp: String) -> HttpResponse {
