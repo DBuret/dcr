@@ -20,17 +20,19 @@ endif::[]
 
 DCR is a small standalone web app designed to help debugging the environment of orchestred containers, through a very small Rust app.
 
-CAUTION: this project is in very ealry stage. It is just a way for me to learn Rust. If you feel this kind of tool can be usefull for you, please see https://github.com/DBuret/DCR[DCR] that has the same features.
+CAUTION: this project is in very ealry stage. It is just a way for me to learn Rust. If you feel this kind of tool can be usefull for you, please see https://github.com/DBuret/gse[GSE] that has the same purprose, with all features working (GSE is a golang version of DCR)
 
-.DCR will offers endpoints
+.DCR will offers the follwing endpoints
 * [x] displays its env and the details of the http request it received
 ** usefull to understand what env and request your containers receive
 ** Display of the payload of PUT/POST request is not implemented yet
 * [x] healthcheck that can also be turned in ok or ko state through a simple http call
 ** usefull to play with your container orchestrator (kubernetes, nomad...) routing system.
-* [ ] logger tonoutput what you want on the log output
+* [ ] logger to output what you want on the log output
 ** usefull to test your that log gathering system
 ** Not implemented yat
+* [x] version display 
+** stamp is not implemented yet
 
 == Endpoints
 
@@ -98,34 +100,22 @@ DCR accepts some parameters, either through command line flags or env vars.
 
 |===
 
-.We also have the standard -h cli arg
-[source,console]
-----
-$ ./dcr -h
-----
-
-Since we use https://github.com/namsral/flag to parse arguments, they can be fed either through command line or env vars. 
-
 CAUTION: flag parsing when value is `/...` seems to be bugged on windows. You cannot change the basepath on DCR if you run on windows.
 
 
 == Compile
 
-Goal is to create a small but standalone binary to allow us to build a small container image. 
 
 .Build with static linking so we can Dockerfile FROM scratch
 [source,console]
 ----
-$ CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags "-s -w" .
+$ cargo build -release
 ----
 
-The resulting binary should be < 9 Mb. 
-
-TIP: If that's too big, you can use upx to reduce file size to ~ 2.5 Mb
-
-.Run
+.SEt environment and Run
 [source,console]
 ----
+$ . dcr.env
 $ ./dcr
 ----
 
@@ -133,12 +123,8 @@ point your web browser to http://localhost:28657/dcr
 
 == Create docker image
 
-the following is a multi stage docker build.
-first we compile and compress executable in the _builder_ stage, then we create an image `FROM scratch'
-
 .Dockerfile
-Under construction, not optimized, very long to execute
-
+Under construction, not optimized, very long to execute, ...
 
 .Build image 
 [source,console]
@@ -151,7 +137,7 @@ $ sudo docker build -t dcr .
 === Using default config
 [source,console]
 ----
-$ sudo docker run -p 28657:28657 DCR
+$ sudo docker run -p 28657:28657 dcr
 ----
 
 point your web browser to http://localhost:28657/dcr 
