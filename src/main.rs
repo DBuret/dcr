@@ -1,16 +1,15 @@
 #[macro_use]
 extern crate log;
-
 extern crate actix_web;
 extern crate env_logger;
-use std::{env, io};
+
 
 use actix_web::http::{header, Method, StatusCode};
 use actix_web::{
     error, guard, middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer, Result,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-
+use std::{env, io};
 const DCR_VERSION: &str = "0.1";
 
 static HEALTH: AtomicBool = AtomicBool::new(true);
@@ -38,7 +37,6 @@ fn main() -> io::Result<()> {
     let path_health = format!("{}/health", dcr_basepath);
     let path_version = format!("{}/version", dcr_basepath);
     let path_logger = format!("{}/logger", dcr_basepath);
-
 
     // server
     HttpServer::new(move || {
@@ -79,8 +77,12 @@ fn main() -> io::Result<()> {
 }
 
 fn main_handler(req: HttpRequest) -> HttpResponse {
-    debug!("entering main_handler");
-    info!("{:#?} {} {}", req.version(), req.method(), req.uri());
+    info!(
+        "{:#?} {} {} - 200 OK",
+        req.version(),
+        req.method(),
+        req.uri()
+    );
     let mut body = String::from("<html><body>");
     body.push_str("<H1>Program</H1>");
 
@@ -115,7 +117,7 @@ fn main_handler(req: HttpRequest) -> HttpResponse {
         .body(body)
 }
 
-fn health_handler(req: HttpRequest) -> HttpResponse {
+fn health_handler(_req: HttpRequest) -> HttpResponse {
 
     if HEALTH.load(Ordering::Relaxed) {
         HttpResponse::build(StatusCode::OK)
@@ -133,31 +135,47 @@ fn health_toggle_handler(req: HttpRequest) -> HttpResponse {
 
     let hc = !HEALTH.load(Ordering::Relaxed);
     HEALTH.store(hc, Ordering::Relaxed);
-    info!("Healthcheck status toggled to: {} ", hc);
+    info!(
+        "{:#?} {} {} - 200 OK - Healthcheck status toggled to: {} ",
+        req.version(),
+        req.method(),
+        req.uri(),
+        hc
+    );
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
         .body(format!("healthcheck toggled to {} state", hc))
 }
 
+//nts: add stamp here
 fn version_handler(req: HttpRequest, dcr_stamp: String) -> HttpResponse {
-
+    info!(
+        "{:#?} {} {} - 200 OK",
+        req.version(),
+        req.method(),
+        req.uri()
+    );
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body(format!("{}", DCR_VERSION)) //nts: add stamp here
+        .body(format!("{}", DCR_VERSION))
 }
 
+//nts: get input
 fn logger_handler(req: HttpRequest) -> HttpResponse {
-    debug!("entering logger_handler");
+    info!("");
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body("logger handler")
+        .body("input written to log")
 }
-
 
 /// 404 handler
-fn p404() -> HttpResponse {
-    debug!("entering 404_handler");
-
+fn p404(req: HttpRequest) -> HttpResponse {
+    info!(
+        "{:#?} {} {} - 404 NOT FOUND",
+        req.version(),
+        req.method(),
+        req.uri()
+    );
     HttpResponse::build(StatusCode::NOT_FOUND)
         .content_type("text/html; charset=utf-8")
         .body("NOT FOUND")
