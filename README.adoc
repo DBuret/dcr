@@ -1,0 +1,172 @@
+= DCR: "Debugging Containers with Rust" micro HTTP service
+:author: David Buret
+:source-highlighter: rouge
+:pygments-style: github
+:icons: font
+:sectnums:
+:toclevels: 4
+:toc:
+:imagesdir: images/
+:gitplant: http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/DBuret/dcr/master/
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+== Introduction 
+
+DCR is a small standalone web app designed to help debugging the environment of orchestred containers, through a very small Rust app.
+
+CAUTION: this project is in very ealry stage. It is just a way for me to learn Rust. If you feel this kind of tool can be usefull for you, please see https://github.com/DBuret/DCR[DCR] that has the same features.
+
+.DCR will offers endpoints
+* [x] displays its env and the details of the http request it received
+** usefull to understand what env and request your containers receive
+** Display of the payload of PUT/POST request is not implemented yet
+* [x] healthcheck that can also be turned in ok or ko state through a simple http call
+** usefull to play with your container orchestrator (kubernetes, nomad...) routing system.
+* [ ] logger tonoutput what you want on the log output
+** usefull to test your that log gathering system
+** Not implemented yat
+
+== Endpoints
+
+=== Display environment
+
+* `/dcr` endpoint can be queried through any HTTP method (GET, PUT, ...). It will answer an HTTP 200 status, with an HTML content displaying information about the HTTP request received
+** headers
+** hostname
+** path
+** POST/PUT/... parameters ([red]#not yet#)
+* note that this endpoint will write a one line log to stdout
+* `/dcr` can be changed to another path via the `DCR_BASEPATH` pararameter. Other endpoints (version, healthcheck) will inherit this parameters.
+
+=== Display version & stamp
+* `/DCR/version` endpoint can be queried through any HTTP method (GET, PUT, ...). It will answer an HTTP 200 status,with a single text line content made of program version and its stamp (if one has been specified, default stamp being empty) 
+* the "stamp" allows us to test rolling, blue/green, or canary update with our container orchestrator: the same docker image (=same version) can be run with a given stamp (see DCR_STAMP bellow) given as parameter by the orchestrator, so we can differenciate to deployments, exemple:
+** with no stamp, the answer will be `3.0`
+** with DCR_STAMP="A",  the answer will be `3.0A`
+
+
+=== Healthcheck
+* `/DCR/health` is a endpoint to be used as healthcheck through an HTTP `GET` query. Answer will be 
+** when healtcheck is on: HTTP 200 status, content will be the text string _I'm alive_ 
+** when healthcheck is off: HTTP 503 status, content will be the text string _I'm sick_ 
+** no log will be written to stdout
+* healthcheck can be switched on/off (flip/flop) with an access with HTTP `POST` or `PUT` methods:
+*** `curl -X POST http://127.0.0.1:28657/DCR/health`
+*** `curl -X PUT http://127.0.0.1:28657/DCR/health`
+*** note that `POST` or `PUT` access to this endpoint writes log to stdout:
+
+    healthcheck has been switched to false
+    healthcheck has been switched to true
+
+=== logger
+WARNING: This endpoint is not activated by default since input sanitization is crappy. Use at your own risk
+
+NOTE: sanitization will remove *all* characters from input except `0-9A-Za-z{}:,[]`
+
+*  `/DCR/logger` is an HTTP `POST` or `PUT` endpoint that will write to stdout the payload of the POST request
+* answer: HTTP 200 status, content will be the text string _data ingested._ 
+
+.exemple
+ curl -X PUT -dTextinLog  http://localhost:28657/dcr/logger
+
+
+== Parameters
+
+DCR accepts some parameters, either through command line flags or env vars. 
+
+.DCR parameters
+[cols="3,^1,^1,^1,^1"]
+|===
+| parameter | env var name | cli name | type |default value 
+
+| path in the url (note: impacts all endpoints)| `DCR_BASEPATH` | `-basepath` |string | `/dcr`
+
+| tcp port to listen to | `DCR_PORT` | `-port` | int  | `28657`
+
+| stamp added to version endpoint | `DCR_STAMP`| `-stamp` | string | empty
+
+| set healthcheck answer to HTTP 200 or HTTP 503 | `DCR_HEALTHCHECK` | `-healthcheck` | boolean | `true`
+
+| activate logger endpoint | `DCR_LOGGER` | `-logger` | boolean | `false`
+
+
+|===
+
+.We also have the standard -h cli arg
+[source,console]
+----
+$ ./dcr -h
+----
+
+Since we use https://github.com/namsral/flag to parse arguments, they can be fed either through command line or env vars. 
+
+CAUTION: flag parsing when value is `/...` seems to be bugged on windows. You cannot change the basepath on DCR if you run on windows.
+
+
+== Compile
+
+Goal is to create a small but standalone binary to allow us to build a small container image. 
+
+.Build with static linking so we can Dockerfile FROM scratch
+[source,console]
+----
+$ CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags "-s -w" .
+----
+
+The resulting binary should be < 9 Mb. 
+
+TIP: If that's too big, you can use upx to reduce file size to ~ 2.5 Mb
+
+.Run
+[source,console]
+----
+$ ./dcr
+----
+
+point your web browser to http://localhost:28657/dcr 
+
+== Create docker image
+
+the following is a multi stage docker build.
+first we compile and compress executable in the _builder_ stage, then we create an image `FROM scratch'
+
+.Dockerfile
+Under construction, not optimized, very long to execute
+
+
+.Build image 
+[source,console]
+----
+$ sudo docker build -t dcr .
+----
+
+== Run locally with docker
+
+=== Using default config
+[source,console]
+----
+$ sudo docker run -p 28657:28657 DCR
+----
+
+point your web browser to http://localhost:28657/dcr 
+
+=== using parameters
+[source,console]
+----
+$ sudo docker run -e DCR_BASEPATH=/foo -e DCR_PORT=2000 -e DCR_STAMP=A -e DCR_HEALTHCHECK=false -e DCR_LOGGER=true -p 2000:2000 DCR
+----
+
+.Point your web browser to
+* http://localhost:2000/foo 
+* http://localhost:2000/foo/version
+* http://localhost:2000/foo/health
+
+.Set healthcheck endpoint to "ok"
+ $ curl -X PUT http://localhost:2000/foo/health
+

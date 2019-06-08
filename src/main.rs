@@ -19,18 +19,12 @@ const DCR_VERSION: &str = "0.1";
 static HEALTH: AtomicBool = AtomicBool::new(true);
 
 /// debug handler
-fn debug_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error> {
+fn debug_handler(body: web::Payload) ->  HttpResponse {
     debug!("entering debug zone");
-    body.map_err(Error::from)
-        .fold(web::BytesMut::new(), move |mut body, chunk| {
-            body.extend_from_slice(&chunk);
-            Ok::<_, Error>(body)
-        })
-        .and_then(|body| {
-            format!("Body {:?}!", body);
-            Ok(HttpResponse::Ok().finish())
-        })
 
+    HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body::BodyStream)
 }
 
 
@@ -75,7 +69,7 @@ fn main() -> io::Result<()> {
                     .route(web::post().to(logger_handler)),
             )
             .service(web::resource(&path_version).route(web::get().to(version_handler)))
-            .service(web::resource("/debug").route(web::route().to_async(debug_handler)))
+            .service(web::resource("/debug").route(web::route().to(debug_handler)))
             .service(web::resource(&dcr_basepath).route(web::route().to(main_handler)))
             // default
             .default_service(
