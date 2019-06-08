@@ -11,7 +11,7 @@ use actix_web::{
     error, guard, middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer, Result,
 };
 
-const dcr_version: &str = "0.1";
+const DCR_VERSION: &str = "0.1";
 
 fn main() -> io::Result<()> {
     // logger init
@@ -66,9 +66,46 @@ fn main() -> io::Result<()> {
 }
 
 fn main_handler(req: HttpRequest) -> HttpResponse {
+    let mut body = String::from("<html><body>");
+    body.push_str("<H1>Program</H1>");
+
+    body.push_str(&"<H1>Request</H1>");
+    body.push_str("<textarea cols=150 readonly>");
+    body.push_str(&format!("Protocol: {:?}\n", req.version()));
+    body.push_str(&format!("Method: {:?}\n", req.method()));
+    body.push_str(&format!("URI: {:?}", req.uri()));
+    body.push_str("</textarea>");
+
+    body.push_str("<H1>Headers</H1>");
+    body.push_str("<textarea cols=150 rows=20 readonly>");
+    for (key, value) in req.headers() {
+        body.push_str(&format!("{}: {:#?}\n", key, value));
+    }
+    body.push_str("</textarea>");
+
+    body.push_str("<H1>Data</H1>");
+
+
+    body.push_str("<H1>Env</H1>");
+    body.push_str("<hr><textarea cols=150 rows=20 readonly>");
+    for (key, value) in env::vars() {
+        body.push_str(&format!("{}: {}\n", key, value));
+    }
+    body.push_str("</textarea>\n");
+
+    body.push_str(&"<H1>Debug: http request</H1>");
+    body.push_str(
+        "<textarea cols=150 rows=20 
+    readonly>",
+    );
+    body.push_str(&format!("{:#?}", req));
+    body.push_str("</textarea>");
+
+    body.push_str("</textarea></body></html>\n");
+
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body(format!("{:?}", req))
+        .body(body)
 }
 
 fn health_handler(req: HttpRequest) -> HttpResponse {
@@ -83,12 +120,11 @@ fn health_toggle_handler(req: HttpRequest) -> HttpResponse {
         .body("health toggle handler")
 }
 
-
 fn version_handler(req: HttpRequest, dcr_stamp: String) -> HttpResponse {
-    // response
+
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body(dcr_version)
+        .body(DCR_VERSION)
 }
 
 fn logger_handler(req: HttpRequest) -> HttpResponse {
@@ -96,17 +132,6 @@ fn logger_handler(req: HttpRequest) -> HttpResponse {
         .content_type("text/html; charset=utf-8")
         .body("logger handler")
 }
-
-
-/*
-fn welcome(req: HttpRequest) -> Result<HttpResponse> {
-    println!("{:?}", req);
-
-     // response
-    /Ok(HttpResponse::build(StatusCode::OK)
-        .content_type("text/html; charset=utf-8")
-        .body(include_str!("../static/template.html")))
-        */
 
 
 /// 404 handler
