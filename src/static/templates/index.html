@@ -1,0 +1,53 @@
+<html>
+
+<head>
+    <style type="text/css">
+        h1 {
+            font-family: Calibri, Sans-Serif;
+        }
+
+        h2 {
+            font-family: Calibri, Sans-Serif;
+            color: darkblue;
+        }
+
+        code {
+            background: #dddddd;
+            display: block
+        }
+    </style>
+    <title>DCR</title>
+</head>
+
+<body>
+    <h1>HTTP request</h1>
+    <h2>Method, Host, URL and Protocol</h2>
+    <code>
+        Method={{method}}
+        <br> Host={{host}}
+        <br> URI={{uri}}
+        <br> Proto={{version}}
+        <br>
+    </code>
+        
+
+    <h2>HTTP Headers received</h2>
+    <textarea rows="10">
+        {{header}}
+    </textarea>
+
+    <h2>Body of the Request (for methods PUT, POST, ...)</h2>
+    <textarea rows="10">
+
+        {{request}}
+        &nbsp;
+    </textarea>
+
+    <h1>ENV</h1>
+    <textarea rows="10">
+        {{env}}
+        <br>
+    </textarea>
+</body>
+
+</html>

@@ -15,7 +15,10 @@ use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{env, io};
 
-const DCR_VERSION: &str = "0.1";
+use handlebars::Handlebars;
+
+
+const DCR_VERSION: &str = "0.2";
 static HEALTH: AtomicBool = AtomicBool::new(true);
 
 fn debug_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error> {
@@ -37,46 +40,40 @@ fn debug_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error =
 }
 
 
-fn main_handler(req: HttpRequest) -> HttpResponse {
+fn main_handler(hb: web::Data<Arc<Handlebars>>,req: HttpRequest) -> HttpResponse {
     info!(
         "{:#?} {} {} - 200 OK",
         req.version(),
         req.method(),
         req.uri()
     );
-    let mut body = String::from("<html><body>");
-    body.push_str("<H1>Program</H1>");
-
-    body.push_str(&"<H1>Request</H1>");
-    body.push_str("<textarea cols=150 readonly>");
-    body.push_str(&format!("Protocol: {:?}\n", req.version()));
-    body.push_str(&format!("Method: {:?}\n", req.method()));
-    body.push_str(&format!("URI: {:?}", req.uri()));
-    body.push_str("</textarea>");
-
-    body.push_str("<H1>Headers</H1>");
-    body.push_str("<textarea cols=150 rows=20 readonly>");
+    // <textarea cols=150 rows=20 readonly>
+    let mut header_content = Strings.new();
     for (key, value) in req.headers() {
-        body.push_str(&format!("{}: {:#?}\n", key, value));
+        header_content.push_str(&format!("{}: {:#?}\n", key, value));
     }
-    body.push_str("</textarea>");
-
-    body.push_str("<H1>Data</H1>");
-
-
-    body.push_str("<H1>Env</H1>");
-    body.push_str("<hr><textarea cols=150 rows=20 readonly>");
+    
+    let mut env_content = String::new();
     for (key, value) in env::vars() {
-        body.push_str(&format!("{}: {}\n", key, value));
+        env_content.push_str(&format!("{}: {}\n", key, value));
     }
-    body.push_str("</textarea>");
+    
+    let data = json!({
+        "version": req.version(),
+        "method": req.method(),
+        "uri" : req.uri(),
+        "header" : hedar_content,
+        "request" : "not implemented",
+        "env" : env_content
+    });
 
-    body.push_str("</body></html>\n");
+    let body = hb.render("index", &data).unwrap();
 
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
         .body(body)
 }
+
 
 fn health_handler(_req: HttpRequest) -> HttpResponse {
 
@@ -89,8 +86,8 @@ fn health_handler(_req: HttpRequest) -> HttpResponse {
             .content_type("text/html; charset=utf-8")
             .body("KO")
     }
-
 }
+
 
 fn health_toggle_handler(req: HttpRequest) -> HttpResponse {
 
@@ -108,7 +105,7 @@ fn health_toggle_handler(req: HttpRequest) -> HttpResponse {
         .body(format!("healthcheck toggled to {} state", hc))
 }
 
-//nts: add stamp here
+
 fn version_handler(req: HttpRequest, dcr_stamp: String) -> HttpResponse {
     info!(
         "{:#?} {} {} - 200 OK",
@@ -121,7 +118,7 @@ fn version_handler(req: HttpRequest, dcr_stamp: String) -> HttpResponse {
         .body(format!("{}", DCR_VERSION))
 }
 
-//nts: get input
+
 fn logger_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error> {
     body.map_err(Error::from)
         .fold(web::BytesMut::new(), move |mut body, chunk| {
@@ -130,8 +127,7 @@ fn logger_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error 
         })
         .and_then(|body| {
             //let mut output = String::from(format!("{:?}", body));
-
-            //Ok(HttpResponse::Ok().finish())
+ 			info!("{:?}", body);
             Ok(HttpResponse::build(StatusCode::OK)
                 .content_type("text/html; charset=utf-8")
                 .body("data ingested"))
@@ -139,7 +135,6 @@ fn logger_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error 
 }
 
 
-/// 404 handler
 fn p404(req: HttpRequest) -> HttpResponse {
     info!(
         "{:#?} {} {} - 404 NOT FOUND",
@@ -149,7 +144,7 @@ fn p404(req: HttpRequest) -> HttpResponse {
     );
     HttpResponse::build(StatusCode::NOT_FOUND)
         .content_type("text/html; charset=utf-8")
-        .body("NOT FOUND")
+        .body("Oops, you requested an unknown location.\n")
 }
 
 
@@ -160,7 +155,6 @@ fn main() -> io::Result<()> {
 
     // parse env
     //let dcr_basepath = env::var("DCR_BASEPATH").expect("DCR_BASEPATH must be set");
-
     let dcr_basepath = "/dcr";
     let dcr_port = env::var("DCR_PORT").expect("DCR_PORT must be set");
     let dcr_stamp = env::var("DCR_STAMP").expect("DCR_STAMP must be set");
@@ -176,10 +170,20 @@ fn main() -> io::Result<()> {
     let path_health = format!("{}/health", dcr_basepath);
     let path_version = format!("{}/version", dcr_basepath);
     let path_logger = format!("{}/logger", dcr_basepath);
+    
+    // Handlebars uses a repository for the compiled templates. This object must be
+    // shared between the application threads, and is therefore passed to the
+    // Application Builder as an atomic reference-counted pointer.
+    let mut handlebars = Handlebars::new();
+    handlebars
+        .register_templates_directory(".html", "./static/templates")
+        .unwrap();
+    let handlebars_ref = web::Data::new(Arc::new(handlebars));
 
     // server
     HttpServer::new(move || {
         App::new()
+        	 .register_data(handlebars_ref.clone())
             // enable logger - always register actix-web Logger middleware last
             .wrap(middleware::Logger::default())
             .service(
