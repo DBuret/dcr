@@ -14,3 +14,4 @@ env_logger = "0.6.1"
 actix-rt = "0.2.2"
 rand = "0.6.5"
 serde = { version = "1.0.92", features = ["derive"] }
+handlebars = "1.2.0"
