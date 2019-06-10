@@ -147,7 +147,7 @@ fn main() -> io::Result<()> {
         process::exit(1);
     });
 
-    let bind_addr = format!("127.0.0.1:{}", config.port);
+    let bind_addr = format!("0.0.0.0:{}", config.port);
 
     info!(
         "Version {}{} on http://{}{}. Healthcheck is {} and logger endpoint is {}",
