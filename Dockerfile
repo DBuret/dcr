@@ -55,7 +55,6 @@ LABEL link="https://github.com/DBuret/dcr"
 LABEL description="Debug Containers with Rust - micro HTTP service to help understanding container orchestrators environment"
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /source/target/x86_64-unknown-linux-musl/release/dcr /
-RUN mkdir -p /static
 COPY --from=builder /source/static  /static
 
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt

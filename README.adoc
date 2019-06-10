@@ -24,10 +24,10 @@ CAUTION: this project is in very early stage. Many features are not implemented 
 
 TIP: If you feel this kind of tool can be usefull for you, please see https://github.com/DBuret/gse[GSE] that has the same purprose, with all features working (GSE is a golang version of DCR)
 
-.DCR will offers the follwing endpoints
+.DCR will offers the following endpoints
 * [x] *displays its env* and the details of the http request it received
 ** usefull to understand what env and request your containers receive
-** Display of the payload of PUT/POST request is not implemented yet
+** The content of the payload of PUT/POST is not yet included in the display. 
 * [x] *healthcheck* that can also be turned in ok or ko state through a simple http call
 ** usefull to play with your container orchestrator (kubernetes, nomad...) routing system.
 * [ ] *logger* to output what you want on the log output
@@ -47,35 +47,41 @@ TIP: If you feel this kind of tool can be usefull for you, please see https://gi
 ** POST/PUT/... parameters ([red]#not yet#)
 * note that this endpoint will write a one line log to stdout
 * `/dcr` can be changed to another path via the `DCR_BASEPATH` pararameter. Other endpoints (version, healthcheck) will inherit this parameters.
+* each time this endpoint is reached, a log is written to stdout
+
+ [2019-06-08T18:15:11Z INFO  dcr] HTTP/1.1 GET /dcr - 200 OK
 
 === Display version & stamp
 * `/DCR/version` endpoint can be queried through any HTTP method (GET, PUT, ...). It will answer an HTTP 200 status,with a single text line content made of program version and its stamp (if one has been specified, default stamp being empty) 
 * the "stamp" allows us to test rolling, blue/green, or canary update with our container orchestrator: the same docker image (=same version) can be run with a given stamp (see DCR_STAMP bellow) given as parameter by the orchestrator, so we can differenciate to deployments, exemple:
 ** with no stamp, the answer will be `3.0`
 ** with DCR_STAMP="A",  the answer will be `3.0A`
+* each time this endpoint is reached, a log is written to stdout
+
+ [2019-06-08T18:16:13Z INFO  dcr] HTTP/1.1 GET /dcr/version - 200 OK
 
 
 === Healthcheck
 * `/DCR/health` is a endpoint to be used as healthcheck through an HTTP `GET` query. Answer will be 
 ** when healtcheck is on: HTTP 200 status, content will be the text string _I'm alive_ 
 ** when healthcheck is off: HTTP 503 status, content will be the text string _I'm sick_ 
-** no log will be written to stdout
+** no log will be written to stdout when reaching the healtcheck endpoint
 * healthcheck can be switched on/off (flip/flop) with an access with HTTP `POST` or `PUT` methods:
-*** `curl -X POST http://127.0.0.1:28657/DCR/health`
-*** `curl -X PUT http://127.0.0.1:28657/DCR/health`
-*** note that `POST` or `PUT` access to this endpoint writes log to stdout:
+** `curl -X POST http://127.0.0.1:28657/dcr/health`
+** `curl -X PUT http://127.0.0.1:28657/dcr/health`
+** note that `POST` or `PUT` access to this endpoint writes log to stdout:
 
-    healthcheck has been switched to false
-    healthcheck has been switched to true
+    [2019-06-08T18:11:33Z INFO  dcr] HTTP/1.1 POST /dcr/health - 200 OK - Healthcheck status toggled to: false
 
 === logger
 WARNING: This endpoint is not activated by default since input sanitization is crappy. Use at your own risk
 
 *  `/DCR/logger` is an HTTP `POST` or `PUT` endpoint that will write to stdout the payload of the POST request
-* answer: HTTP 200 status, content will be the text string _data ingested._ 
+* answer: HTTP 200 status, content will be the text string _input written to log_ 
 
 .exemple
- curl -X PUT -dTextinLog  http://localhost:28657/dcr/logger
+    $ curl -X PUT -dTextinLog  http://localhost:28657/dcr/logger
+    input written to log
 
 
 == Parameters
@@ -100,7 +106,7 @@ DCR accepts some parameters, either through command line flags or env vars.
 
 |===
 
-CAUTION: flag parsing when value is `/...` seems to be bugged on windows. You cannot change the basepath on DCR if you run on windows.
+CAUTION: flag parsing when value is `/...` seems to be bugged on windows. You cannot change the basepath of DCR if you run on windows.
 
 
 == Compile
@@ -112,7 +118,7 @@ CAUTION: flag parsing when value is `/...` seems to be bugged on windows. You ca
 $ cargo build -release
 ----
 
-.SEt environment and Run
+.Set environment and Run
 [source,console]
 ----
 $ . dcr.env
