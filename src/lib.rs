@@ -18,6 +18,35 @@ use std::{env, io};
 const DCR_VERSION: &str = "0.1";
 static HEALTH: AtomicBool = AtomicBool::new(true);
 
+//////  
+
+use futures::{Future, Stream};
+use actix_web::{web, error, App, Error, HttpResponse};
+
+/// extract binary data from request
+fn index(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error>
+{
+    body.map_err(Error::from)
+        .fold(web::BytesMut::new(), move |mut body, chunk| {
+            body.extend_from_slice(&chunk);
+            Ok::<_, Error>(body)
+         })
+         .and_then(|body| {
+             format!("Body {:?}!", body);
+             Ok(HttpResponse::Ok().finish())
+         })
+}
+
+fn main() {
+    let app = App::new().service(
+        web::resource("/index.html").route(
+            web::get().to_async(index))
+    );
+}
+///////
+
+
+
 /// debug handler
 fn debug_handler(body: web::Payload) -> HttpResponse {
     debug!("entering debug zone");
