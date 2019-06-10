@@ -114,8 +114,8 @@ fn health_toggle_handler(req: HttpRequest) -> HttpResponse {
         .body(format!("healthcheck toggled to {} state", hc))
 }
 
-// stamp not implemented
-fn version_handler(req: HttpRequest, dcr_stamp: String) -> HttpResponse {
+// stamp in alpha stage
+fn version_handler(stamp: web::Data<String>, req: HttpRequest) -> HttpResponse {
     info!(
         "{:#?} {} {} - 200 OK",
         req.version(),
@@ -124,7 +124,7 @@ fn version_handler(req: HttpRequest, dcr_stamp: String) -> HttpResponse {
     );
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body(format!("{}", DCR_VERSION))
+        .body(format!("{}{:#?}", DCR_VERSION, stamp))
 }
 
 // output is in early alpha stage: simple buffer copy and "debug" format
@@ -163,12 +163,26 @@ fn main() -> io::Result<()> {
     env_logger::init();
 
     // parse env
-    //let dcr_basepath = env::var("DCR_BASEPATH").expect("DCR_BASEPATH must be set");
-    let dcr_basepath = "/dcr";
-    let dcr_port = env::var("DCR_PORT").expect("DCR_PORT must be set");
-    let dcr_stamp = env::var("DCR_STAMP").expect("DCR_STAMP must be set");
-    let dcr_healthcheck = env::var("DCR_HEALTH").expect("DCR_HEALTH must be set");
-    let dcr_logger = env::var("DCR_LOGGER").expect("DCR_LOGGER must be set");
+    let dcr_basepath = match env::var("DCR_BASEPATH") {
+        Ok(val) => val,
+        Err(e) => String::from("/dcr"),
+    };
+    let dcr_port = match env::var("DCR_PORT") {
+        Ok(val) => val,
+        Err(e) => String::from("28657"),
+    };
+    let dcr_stamp = match env::var("DCR_STAMP") {
+        Ok(val) => val,
+        Err(e) => String::from(""),
+    };
+    let dcr_healthcheck = match env::var("DCR_HEALTHCHECK") {
+        Ok(val) => val,
+        Err(e) => String::from("true"),
+    };
+    let dcr_logger = match env::var("DCR_LOGGER") {
+        Ok(val) => val,
+        Err(e) => String::from("true"),
+    };
 
     info!("Config: version {}{} on port {} and path {}. Inital health answer is {} and logger endpoint is {}",DCR_VERSION, dcr_stamp, dcr_port, dcr_basepath, HEALTH.load(Ordering::Relaxed), dcr_logger);
 
@@ -176,13 +190,11 @@ fn main() -> io::Result<()> {
 
     HEALTH.store(true, Ordering::Relaxed);
 
+    let path = format!("{}", dcr_basepath);
     let path_health = format!("{}/health", dcr_basepath);
     let path_version = format!("{}/version", dcr_basepath);
     let path_logger = format!("{}/logger", dcr_basepath);
 
-    // Handlebars uses a repository for the compiled templates. This object must be
-    // shared between the application threads, and is therefore passed to the
-    // Application Builder as an atomic reference-counted pointer.
     let mut handlebars = Handlebars::new();
     handlebars
         .register_templates_directory(".html", "./static/templates")
@@ -193,7 +205,7 @@ fn main() -> io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .register_data(handlebars_ref.clone())
-            // enable logger - always register actix-web Logger middleware last
+            .register_data(web::Data::new(String::from(dcr_stamp.clone())))
             .wrap(middleware::Logger::default())
             .service(
                 web::resource(&path_health)
@@ -208,10 +220,8 @@ fn main() -> io::Result<()> {
             )
             .service(web::resource(&path_version).route(web::get().to(version_handler)))
             //.service(web::resource("/debug").route(web::route().to_async(debug_handler)))
-            .service(web::resource(&dcr_basepath).route(web::route().to(main_handler)))
-            // default
+            .service(web::resource(&path).route(web::route().to(main_handler)))
             .default_service(
-                // 404 for GET request
                 web::resource("")
                     .route(web::get().to(p404))
                     // all requests that are not `GET`

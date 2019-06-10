@@ -32,7 +32,7 @@ TIP: If you feel this kind of tool can be usefull for you, please see https://gi
 ** usefull to play with your container orchestrator (kubernetes, nomad...) routing system.
 * [ ] *logger* to output what you want on the log output
 ** usefull to test your log gathering system
-** Not implemented yat
+** in alpha stage, your message will be print to log as `b"message"`
 * [x] *version display* 
 ** usefull to follow rolling updates
 
@@ -151,7 +151,7 @@ point your web browser to http://localhost:28657/dcr
 === using parameters
 [source,console]
 ----
-$ sudo docker run -e DCR_BASEPATH=/foo -e DCR_PORT=2000 -e DCR_STAMP=A -e DCR_HEALTHCHECK=false -e DCR_LOGGER=true -p 2000:2000 DCR
+$ sudo docker run -e DCR_BASEPATH=/foo -e DCR_PORT=2000 -e DCR_STAMP=A -e DCR_HEALTHCHECK=false -e DCR_LOGGER=true -p 2000:2000 dcr:0.2
 ----
 
 .Point your web browser to
