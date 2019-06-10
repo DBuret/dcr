@@ -1,52 +1,30 @@
 #[macro_use]
 extern crate log;
 
-#[macro_use]
-extern crate actix_web;
+/* #[macro_use]
+extern crate actix_web; */
 
-#[macro_use]
-extern crate env_logger;
+/*#[macro_use]
+extern crate env_logger;*/
 
 #[macro_use]
 extern crate serde_json;
 
-use actix_web::error::ErrorBadRequest;
-use actix_web::http::{header, Method, StatusCode};
+use actix_web::http::StatusCode;
 use actix_web::{
-    dev, error, guard, middleware, web, App, Error, FromRequest, HttpRequest, HttpResponse,
-    HttpServer, Result,
+    guard, middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer, Result,
 };
 
 use futures::{Future, Stream};
 use handlebars::Handlebars;
-use serde::Deserialize;
+//use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{env, io};
+use std::{env, io, process};
 
 
 const DCR_VERSION: &str = "0.2";
 static HEALTH: AtomicBool = AtomicBool::new(true);
-
-/*
-fn debug_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error> {
-    debug!("debug endpoint - entering...");
-    body.map_err(Error::from)
-        .fold(web::BytesMut::new(), move |mut body, chunk| {
-            body.extend_from_slice(&chunk);
-            debug!("debug endpoint - fold closure...");
-            Ok::<_, Error>(body)
-        })
-        .and_then(|body| {
-            debug!("debug endpoint - and_then");
-            info!("{:?}", body);
-            //Ok(HttpResponse::Ok().finish())
-            Ok(HttpResponse::build(StatusCode::OK)
-                .content_type("text/html; charset=utf-8")
-                .body("data ingested"))
-        })
-}
-*/
 
 // payload display not implemented
 fn main_handler(hb: web::Data<Arc<Handlebars>>, req: HttpRequest) -> HttpResponse {
@@ -163,37 +141,33 @@ fn main() -> io::Result<()> {
     env_logger::init();
 
     // parse env
-    let dcr_basepath = match env::var("DCR_BASEPATH") {
-        Ok(val) => val,
-        Err(e) => String::from("/dcr"),
-    };
-    let dcr_port = match env::var("DCR_PORT") {
-        Ok(val) => val,
-        Err(e) => String::from("28657"),
-    };
-    let dcr_stamp = match env::var("DCR_STAMP") {
-        Ok(val) => val,
-        Err(e) => String::from(""),
-    };
-    let dcr_healthcheck = match env::var("DCR_HEALTHCHECK") {
-        Ok(val) => val,
-        Err(e) => String::from("true"),
-    };
-    let dcr_logger = match env::var("DCR_LOGGER") {
-        Ok(val) => val,
-        Err(e) => String::from("true"),
-    };
 
-    info!("Config: version {}{} on port {} and path {}. Inital health answer is {} and logger endpoint is {}",DCR_VERSION, dcr_stamp, dcr_port, dcr_basepath, HEALTH.load(Ordering::Relaxed), dcr_logger);
+    let config = Config::new().unwrap_or_else(|err| {
+        println!("Problem parsing environment: {}", err);
+        process::exit(1);
+    });
+
+    let bind_addr = format!("127.0.0.1:{}", config.port);
+
+    info!(
+        "Config: version {}{} on http://{}{}. Healthcheck is {} and logger endpoint is {}",
+        DCR_VERSION,
+        config.stamp,
+        bind_addr,
+        config.path,
+        if HEALTH.load(Ordering::Relaxed) {
+            "OK"
+        } else {
+            "KO"
+        },
+        if config.logger_on {
+            "active"
+        } else {
+            "not active"
+        },
+    );
 
     let sys = actix_rt::System::new("dcr");
-
-    HEALTH.store(true, Ordering::Relaxed);
-
-    let path = format!("{}", dcr_basepath);
-    let path_health = format!("{}/health", dcr_basepath);
-    let path_version = format!("{}/version", dcr_basepath);
-    let path_logger = format!("{}/logger", dcr_basepath);
 
     let mut handlebars = Handlebars::new();
     handlebars
@@ -205,22 +179,22 @@ fn main() -> io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .register_data(handlebars_ref.clone())
-            .register_data(web::Data::new(String::from(dcr_stamp.clone())))
+            .register_data(web::Data::new(String::from(config.stamp.clone())))
             .wrap(middleware::Logger::default())
             .service(
-                web::resource(&path_health)
+                web::resource(&config.path_health)
                     .route(web::get().to(health_handler))
                     .route(web::put().to(health_toggle_handler))
                     .route(web::post().to(health_toggle_handler)),
             )
             .service(
-                web::resource(&path_logger)
+                web::resource(&config.path_logger)
                     .route(web::put().to_async(logger_handler))
                     .route(web::post().to_async(logger_handler)),
             )
-            .service(web::resource(&path_version).route(web::get().to(version_handler)))
+            .service(web::resource(&config.path_version).route(web::get().to(version_handler)))
             //.service(web::resource("/debug").route(web::route().to_async(debug_handler)))
-            .service(web::resource(&path).route(web::route().to(main_handler)))
+            .service(web::resource(&config.path).route(web::route().to(main_handler)))
             .default_service(
                 web::resource("")
                     .route(web::get().to(p404))
@@ -232,13 +206,84 @@ fn main() -> io::Result<()> {
                     ),
             )
     })
-    .bind(format!("127.0.0.1:{}", dcr_port))?
+    .bind(bind_addr)?
     .start();
 
-    info!(
-        "HTTP server successfully started on http://127.0.0.1:{}{}",
-        dcr_port, dcr_basepath
-    );
+
     sys.run()
 }
 
+#[derive(Clone)]
+struct Config {
+    healthcheck_on: bool,
+    logger_on: bool,
+    path: String,
+    path_health: String,
+    path_version: String,
+    path_logger: String,
+    port: String,
+    stamp: String,
+}
+
+impl Config {
+    fn new() -> Result<Config, &'static str> {
+        let path = match env::var("DCR_BASEPATH") {
+            Ok(val) => val,
+            Err(_e) => String::from("/dcr"),
+        };
+        let port = match env::var("DCR_PORT") {
+            Ok(val) => val,
+            Err(_e) => String::from("28657"),
+        };
+        let stamp = match env::var("DCR_STAMP") {
+            Ok(val) => val,
+            Err(_e) => String::from(""),
+        };
+        let healthcheck_on = match env::var("DCR_HEALTHCHECK") {
+            Ok(_val) => false,
+            Err(_e) => true,
+        };
+        let logger_on = match env::var("DCR_LOGGER") {
+            Ok(_val) => false,
+            Err(_e) => true,
+        };
+
+        let path_health = format!("{}/health", path);
+        let path_version = format!("{}/version", path);
+        let path_logger = format!("{}/logger", path);
+
+        HEALTH.store(healthcheck_on, Ordering::Relaxed);
+
+        Ok(Config {
+            healthcheck_on,
+            logger_on,
+            path,
+            path_health,
+            path_version,
+            path_logger,
+            port,
+            stamp,
+        })
+    }
+}
+
+
+/*
+fn debug_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error> {
+    debug!("debug endpoint - entering...");
+    body.map_err(Error::from)
+        .fold(web::BytesMut::new(), move |mut body, chunk| {
+            body.extend_from_slice(&chunk);
+            debug!("debug endpoint - fold closure...");
+            Ok::<_, Error>(body)
+        })
+        .and_then(|body| {
+            debug!("debug endpoint - and_then");
+            info!("{:?}", body);
+            //Ok(HttpResponse::Ok().finish())
+            Ok(HttpResponse::build(StatusCode::OK)
+                .content_type("text/html; charset=utf-8")
+                .body("data ingested"))
+        })
+}
+*/

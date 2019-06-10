@@ -74,15 +74,19 @@ TIP: If you feel this kind of tool can be usefull for you, please see https://gi
     [2019-06-08T18:11:33Z INFO  dcr] HTTP/1.1 POST /dcr/health - 200 OK - Healthcheck status toggled to: false
 
 === logger
-WARNING: This endpoint is not activated by default since input sanitization is crappy. Use at your own risk
 
 *  `/DCR/logger` is an HTTP `POST` or `PUT` endpoint that will write to stdout the payload of the POST request
-* answer: HTTP 200 status, content will be the text string _input written to log_ 
+* it is used to write data to the application logs (= stdout), to test your log aggregation/alarm system
+* answer: HTTP 200 status, content will be the text string _data ingested_ 
 
 .exemple
-    $ curl -X PUT -dTextinLog  http://localhost:28657/dcr/logger
-    input written to log
+    $ curl -X PUT -d"Text in Log"  http://localhost:28657/dcr/logger
 
+.answer
+    data ingested
+
+.in the log of DCR - alpha version => b"...."
+ [2019-06-10T17:46:45Z INFO  dcr] b"Text in Log"
 
 == Parameters
 
@@ -101,7 +105,7 @@ DCR accepts some parameters, either through command line flags or env vars.
 
 | set healthcheck answer to HTTP 200 or HTTP 503 | `DCR_HEALTHCHECK` | `-healthcheck` | boolean | `true`
 
-| activate logger endpoint | `DCR_LOGGER` | `-logger` | boolean | `false`
+//| activate logger endpoint | `DCR_LOGGER` | `-logger` | boolean | `false`
 
 
 |===
@@ -109,33 +113,33 @@ DCR accepts some parameters, either through command line flags or env vars.
 CAUTION: flag parsing when value is `/...` seems to be bugged on windows. You cannot change the basepath of DCR if you run on windows.
 
 
-== Compile
+== Compile and Run - with locally installed rust
 
+.Install rust
+https://www.rust-lang.org/tools/install
 
-.Build with static linking so we can Dockerfile FROM scratch
+.Compile
 [source,console]
 ----
 $ cargo build -release
 ----
 
-.Set environment and Run
+.Run
 [source,console]
 ----
-$ . dcr.env
-$ ./dcr
+$ target/release/dcr
+[2019-06-10T16:22:45Z INFO  dcr] Config: version 0.2 on port 28657 and path /dcr. Inital health answer is true and logger endpoint is false
+[2019-06-10T16:22:45Z INFO  dcr] HTTP server successfully started on http://127.0.0.1:28657/dcr
 ----
 
 point your web browser to http://localhost:28657/dcr 
 
-== Create docker image
-
-.Dockerfile
-Under construction, not optimized, very long to execute, ...
+== Compile and run - No need of rust if you have docker 
 
 .Build image 
 [source,console]
 ----
-$ sudo docker build -t dcr .
+$ sudo docker build -t dcr:0.2 .
 ----
 
 == Run locally with docker
@@ -151,7 +155,7 @@ point your web browser to http://localhost:28657/dcr
 === using parameters
 [source,console]
 ----
-$ sudo docker run -e DCR_BASEPATH=/foo -e DCR_PORT=2000 -e DCR_STAMP=A -e DCR_HEALTHCHECK=false -e DCR_LOGGER=true -p 2000:2000 dcr:0.2
+$ sudo docker run -e DCR_BASEPATH=/foo -e DCR_PORT=2000 -e DCR_STAMP=A -e DCR_HEALTHCHECK=false -p 2000:2000 dcr:0.2
 ----
 
 .Point your web browser to
