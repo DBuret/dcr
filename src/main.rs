@@ -50,7 +50,7 @@ fn main_handler(hb: web::Data<Arc<Handlebars>>, req: HttpRequest) -> HttpRespons
         "method": format!("{:?}",req.method()),
         "uri" : format!("{:?}",req.uri()),
         "header" : header_content,
-        "request" : "body rquest display is not yet implemented",
+        "request" : "The dispay of the body request is not implemented yet",
         "env" : env_content
     });
 
@@ -150,7 +150,7 @@ fn main() -> io::Result<()> {
     let bind_addr = format!("127.0.0.1:{}", config.port);
 
     info!(
-        "Config: version {}{} on http://{}{}. Healthcheck is {} and logger endpoint is {}",
+        "Version {}{} on http://{}{}. Healthcheck is {} and logger endpoint is {}",
         DCR_VERSION,
         config.stamp,
         bind_addr,
