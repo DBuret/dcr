@@ -23,7 +23,7 @@ use std::sync::Arc;
 use std::{env, io, process};
 
 
-const DCR_VERSION: &str = "0.2";
+const DCR_VERSION: &str = "0.2.1";
 static HEALTH: AtomicBool = AtomicBool::new(true);
 
 // payload display not implemented
