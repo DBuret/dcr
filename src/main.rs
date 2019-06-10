@@ -1,7 +1,14 @@
 #[macro_use]
 extern crate log;
+
+#[macro_use]
 extern crate actix_web;
+
+#[macro_use]
 extern crate env_logger;
+
+#[macro_use]
+extern crate serde_json;
 
 use actix_web::error::ErrorBadRequest;
 use actix_web::http::{header, Method, StatusCode};
@@ -9,18 +16,19 @@ use actix_web::{
     dev, error, guard, middleware, web, App, Error, FromRequest, HttpRequest, HttpResponse,
     HttpServer, Result,
 };
+
 use futures::{Future, Stream};
-use rand;
+use handlebars::Handlebars;
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::{env, io};
-
-use handlebars::Handlebars;
 
 
 const DCR_VERSION: &str = "0.2";
 static HEALTH: AtomicBool = AtomicBool::new(true);
 
+/*
 fn debug_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error> {
     debug!("debug endpoint - entering...");
     body.map_err(Error::from)
@@ -38,9 +46,10 @@ fn debug_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error =
                 .body("data ingested"))
         })
 }
+*/
 
-
-fn main_handler(hb: web::Data<Arc<Handlebars>>,req: HttpRequest) -> HttpResponse {
+// payload display not implemented
+fn main_handler(hb: web::Data<Arc<Handlebars>>, req: HttpRequest) -> HttpResponse {
     info!(
         "{:#?} {} {} - 200 OK",
         req.version(),
@@ -48,22 +57,22 @@ fn main_handler(hb: web::Data<Arc<Handlebars>>,req: HttpRequest) -> HttpResponse
         req.uri()
     );
     // <textarea cols=150 rows=20 readonly>
-    let mut header_content = Strings.new();
+    let mut header_content = String::new();
     for (key, value) in req.headers() {
         header_content.push_str(&format!("{}: {:#?}\n", key, value));
     }
-    
+
     let mut env_content = String::new();
     for (key, value) in env::vars() {
         env_content.push_str(&format!("{}: {}\n", key, value));
     }
-    
+
     let data = json!({
-        "version": req.version(),
-        "method": req.method(),
-        "uri" : req.uri(),
-        "header" : hedar_content,
-        "request" : "not implemented",
+        "version": format!("{:?}",req.version()),
+        "method": format!("{:?}",req.method()),
+        "uri" : format!("{:?}",req.uri()),
+        "header" : header_content,
+        "request" : "body rquest display is not yet implemented",
         "env" : env_content
     });
 
@@ -105,7 +114,7 @@ fn health_toggle_handler(req: HttpRequest) -> HttpResponse {
         .body(format!("healthcheck toggled to {} state", hc))
 }
 
-
+// stamp not implemented
 fn version_handler(req: HttpRequest, dcr_stamp: String) -> HttpResponse {
     info!(
         "{:#?} {} {} - 200 OK",
@@ -118,7 +127,7 @@ fn version_handler(req: HttpRequest, dcr_stamp: String) -> HttpResponse {
         .body(format!("{}", DCR_VERSION))
 }
 
-
+// output is in early alpha stage: simple buffer copy and "debug" format
 fn logger_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error> {
     body.map_err(Error::from)
         .fold(web::BytesMut::new(), move |mut body, chunk| {
@@ -127,7 +136,7 @@ fn logger_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error 
         })
         .and_then(|body| {
             //let mut output = String::from(format!("{:?}", body));
- 			info!("{:?}", body);
+            info!("{:?}", body);
             Ok(HttpResponse::build(StatusCode::OK)
                 .content_type("text/html; charset=utf-8")
                 .body("data ingested"))
@@ -170,7 +179,7 @@ fn main() -> io::Result<()> {
     let path_health = format!("{}/health", dcr_basepath);
     let path_version = format!("{}/version", dcr_basepath);
     let path_logger = format!("{}/logger", dcr_basepath);
-    
+
     // Handlebars uses a repository for the compiled templates. This object must be
     // shared between the application threads, and is therefore passed to the
     // Application Builder as an atomic reference-counted pointer.
@@ -183,7 +192,7 @@ fn main() -> io::Result<()> {
     // server
     HttpServer::new(move || {
         App::new()
-        	 .register_data(handlebars_ref.clone())
+            .register_data(handlebars_ref.clone())
             // enable logger - always register actix-web Logger middleware last
             .wrap(middleware::Logger::default())
             .service(
@@ -198,7 +207,7 @@ fn main() -> io::Result<()> {
                     .route(web::post().to_async(logger_handler)),
             )
             .service(web::resource(&path_version).route(web::get().to(version_handler)))
-            .service(web::resource("/debug").route(web::route().to_async(debug_handler)))
+            //.service(web::resource("/debug").route(web::route().to_async(debug_handler)))
             .service(web::resource(&dcr_basepath).route(web::route().to(main_handler)))
             // default
             .default_service(
@@ -217,7 +226,7 @@ fn main() -> io::Result<()> {
     .start();
 
     info!(
-        "HTTP server successfully started on http://127.0.0.1:{}/{}",
+        "HTTP server successfully started on http://127.0.0.1:{}{}",
         dcr_port, dcr_basepath
     );
     sys.run()

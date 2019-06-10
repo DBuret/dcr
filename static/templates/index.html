@@ -21,32 +21,28 @@
 
 <body>
     <h1>HTTP request</h1>
-    <h2>Method, Host, URL and Protocol</h2>
-    <code>
-        Method={{method}}
-        <br> Host={{host}}
-        <br> URI={{uri}}
-        <br> Proto={{version}}
-        <br>
+    <h2>Method</h2>
+    <textarea rows="3" cols=132>
+Method={{method}}
+URI={{uri}}
+Proto={{version}}
+    </textarea>
     </code>
-        
+
 
     <h2>HTTP Headers received</h2>
-    <textarea rows="10">
-        {{header}}
+    <textarea rows="5" cols=132>
+{{header}}
     </textarea>
 
     <h2>Body of the Request (for methods PUT, POST, ...)</h2>
-    <textarea rows="10">
-
-        {{request}}
-        &nbsp;
+    <textarea rows="5" cols=132>
+{{request}}
     </textarea>
 
-    <h1>ENV</h1>
-    <textarea rows="10">
-        {{env}}
-        <br>
+    <h1>Environment</h1>
+    <textarea rows="5" cols=132>
+{{env}}
     </textarea>
 </body>
 
