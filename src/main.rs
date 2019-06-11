@@ -20,10 +20,10 @@ use handlebars::Handlebars;
 //use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{env, io, process};
+use std::{env, io, process, str};
 
 
-const DCR_VERSION: &str = "0.2.1";
+const DCR_VERSION: &str = "0.2.2";
 static HEALTH: AtomicBool = AtomicBool::new(true);
 
 // payload display not implemented
@@ -34,7 +34,7 @@ fn main_handler(hb: web::Data<Arc<Handlebars>>, req: HttpRequest) -> HttpRespons
         req.method(),
         req.uri()
     );
-    // <textarea cols=150 rows=20 readonly>
+
     let mut header_content = String::new();
     for (key, value) in req.headers() {
         header_content.push_str(&format!("{}: {:#?}\n", key, value));
@@ -92,7 +92,7 @@ fn health_toggle_handler(req: HttpRequest) -> HttpResponse {
         .body(format!("healthcheck toggled to {} state", hc))
 }
 
-// stamp in alpha stage
+//
 fn version_handler(stamp: web::Data<String>, req: HttpRequest) -> HttpResponse {
     info!(
         "{:#?} {} {} - 200 OK",
@@ -100,12 +100,13 @@ fn version_handler(stamp: web::Data<String>, req: HttpRequest) -> HttpResponse {
         req.method(),
         req.uri()
     );
+
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body(format!("{}{:#?}", DCR_VERSION, stamp))
+        .body(format!("{}{}", DCR_VERSION, stamp.get_ref()))
 }
 
-// output is in early alpha stage: simple buffer copy and "debug" format
+/// logger endpoint: write payload to info log.
 fn logger_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error> {
     body.map_err(Error::from)
         .fold(web::BytesMut::new(), move |mut body, chunk| {
@@ -113,11 +114,14 @@ fn logger_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error 
             Ok::<_, Error>(body)
         })
         .and_then(|body| {
-            //let mut output = String::from(format!("{:?}", body));
-            info!("{:?}", body);
+            let s = match str::from_utf8(&body) {
+                Ok(v) => v,
+                Err(_e) => "output to log refused, Invalid UTF-8 sequence",
+            };
+            info!("{}", s);
             Ok(HttpResponse::build(StatusCode::OK)
                 .content_type("text/html; charset=utf-8")
-                .body("data ingested"))
+                .body("data ingested, check the logs."))
         })
 }
 
@@ -167,8 +171,10 @@ fn main() -> io::Result<()> {
         },
     );
 
+    // create actix system
     let sys = actix_rt::System::new("dcr");
 
+    // configure HTML template engine
     let mut handlebars = Handlebars::new();
     handlebars
         .register_templates_directory(".html", "./static/templates")
@@ -196,14 +202,11 @@ fn main() -> io::Result<()> {
             //.service(web::resource("/debug").route(web::route().to_async(debug_handler)))
             .service(web::resource(&config.path).route(web::route().to(main_handler)))
             .default_service(
-                web::resource("")
-                    .route(web::get().to(p404))
-                    // all requests that are not `GET`
-                    .route(
-                        web::route()
-                            .guard(guard::Not(guard::Get()))
-                            .to(|| HttpResponse::MethodNotAllowed()),
-                    ),
+                web::resource("").route(web::get().to(p404)).route(
+                    web::route()
+                        .guard(guard::Not(guard::Get()))
+                        .to(|| HttpResponse::MethodNotAllowed()),
+                ),
             )
     })
     .bind(bind_addr)?

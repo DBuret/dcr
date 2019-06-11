@@ -8,11 +8,9 @@ DCR offers the following endpoints
 - **healthcheck** that can also be turned in ok or ko state through a simple http call
     - usefull to play with your container orchestrator (kubernetes, nomad...) routing system.
 - **logger** to output what you want on the log output
-    - usefull to test your log gathering system
-    - *WIP:*, your message will be print to log as `b"message"`
+    - usefull to test your log gathering system.
 - **version display** with a stamp
     - usefull to follow rolling updates
-    - *WIP:* stamp display is not clean yet
 
 more details (configuration options) are available at https://github.com/DBuret/dcr
 

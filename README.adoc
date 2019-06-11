@@ -32,9 +32,8 @@ TIP: If you feel this kind of tool can be usefull for you, please see https://gi
 ** usefull to play with your container orchestrator (kubernetes, nomad...) routing system.
 * [ ] *logger* to output what you want on the log output
 ** usefull to test your log gathering system
-** in alpha stage, your message will be print to log as `b"message"`
 * [x] *version display* 
-** usefull to follow rolling updates
+** usefull to follow rolling/blue-green/canary updates: you can 'stamp' your container version through a env var
 
 == Endpoints
 
@@ -73,7 +72,7 @@ TIP: If you feel this kind of tool can be usefull for you, please see https://gi
 
     [2019-06-08T18:11:33Z INFO  dcr] HTTP/1.1 POST /dcr/health - 200 OK - Healthcheck status toggled to: false
 
-=== logger
+=== Logger
 
 *  `/DCR/logger` is an HTTP `POST` or `PUT` endpoint that will write to stdout the payload of the POST request
 * it is used to write data to the application logs (= stdout), to test your log aggregation/alarm system
@@ -112,6 +111,12 @@ DCR accepts some parameters, either through command line flags or env vars.
 
 CAUTION: flag parsing when value is `/...` seems to be bugged on windows. You cannot change the basepath of DCR if you run on windows.
 
+[TIP]
+====
+Upon start, dcr will output a line on stdout with the config it is using, so you can check if your env vars are ok:
+
+ [2019-06-11T18:05:13Z INFO  dcr] Version 0.2.2stamp on http://0.0.0.0:28657/dcr. Healthcheck is OK and logger endpoint is active
+====
 
 == Compile and Run - with locally installed rust
 
