@@ -269,24 +269,3 @@ impl Config {
         })
     }
 }
-
-
-/*
-fn debug_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error> {
-    debug!("debug endpoint - entering...");
-    body.map_err(Error::from)
-        .fold(web::BytesMut::new(), move |mut body, chunk| {
-            body.extend_from_slice(&chunk);
-            debug!("debug endpoint - fold closure...");
-            Ok::<_, Error>(body)
-        })
-        .and_then(|body| {
-            debug!("debug endpoint - and_then");
-            info!("{:?}", body);
-            //Ok(HttpResponse::Ok().finish())
-            Ok(HttpResponse::build(StatusCode::OK)
-                .content_type("text/html; charset=utf-8")
-                .body("data ingested"))
-        })
-}
-*/
