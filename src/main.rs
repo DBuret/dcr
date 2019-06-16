@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::nursery)]
+
 #[macro_use]
 extern crate log;
 
@@ -23,11 +25,14 @@ use std::sync::Arc;
 use std::{env, io, process, str};
 
 
-const DCR_VERSION: &str = "0.2.2";
+const DCR_VERSION: &str = "0.2.3";
 static HEALTH: AtomicBool = AtomicBool::new(true);
 
-// payload display not implemented
-fn main_handler(hb: web::Data<Arc<Handlebars>>, req: HttpRequest) -> HttpResponse {
+fn main_handler(
+    body: web::Payload,
+    hb: web::Data<Arc<Handlebars>>,
+    req: HttpRequest,
+) -> impl Future<Item = HttpResponse, Error = Error> {
     info!(
         "{:#?} {} {} - 200 OK",
         req.version(),
@@ -45,20 +50,32 @@ fn main_handler(hb: web::Data<Arc<Handlebars>>, req: HttpRequest) -> HttpRespons
         env_content.push_str(&format!("{}: {}\n", key, value));
     }
 
-    let data = json!({
-        "version": format!("{:?}",req.version()),
-        "method": format!("{:?}",req.method()),
-        "uri" : format!("{:?}",req.uri()),
-        "header" : header_content,
-        "request" : "The dispay of the body request is not implemented yet",
-        "env" : env_content
-    });
+    body.map_err(Error::from)
+        .fold(web::BytesMut::new(), move |mut body, chunk| {
+            body.extend_from_slice(&chunk);
+            Ok::<_, Error>(body)
+        })
+        .and_then(move |body| {
+            let s = match str::from_utf8(&body) {
+                Ok(v) => v,
+                Err(_e) => "input not displayed, Invalid UTF-8 sequence",
+            };
 
-    let body = hb.render("index", &data).unwrap();
+            let data = json!({
+                "version": format!("{:?}",req.version()),
+                "method": format!("{:?}",req.method()),
+                "uri" : format!("{:?}",req.uri()),
+                "header" : header_content,
+                "input" : s,
+                "env" : env_content
+            });
 
-    HttpResponse::build(StatusCode::OK)
-        .content_type("text/html; charset=utf-8")
-        .body(body)
+            let page = hb.render("index", &data).unwrap();
+
+            Ok(HttpResponse::build(StatusCode::OK)
+                .content_type("text/html; charset=utf-8")
+                .body(page))
+        })
 }
 
 
@@ -147,7 +164,7 @@ fn main() -> io::Result<()> {
     // parse env
 
     let config = Config::new().unwrap_or_else(|err| {
-        println!("Problem parsing environment: {}", err);
+        info!("Problem parsing environment: {}", err);
         process::exit(1);
     });
 
@@ -185,7 +202,7 @@ fn main() -> io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .register_data(handlebars_ref.clone())
-            .register_data(web::Data::new(String::from(config.stamp.clone())))
+            .register_data(web::Data::new(config.stamp.clone()))
             .wrap(middleware::Logger::default())
             .service(
                 web::resource(&config.path_health)
@@ -200,12 +217,12 @@ fn main() -> io::Result<()> {
             )
             .service(web::resource(&config.path_version).route(web::get().to(version_handler)))
             //.service(web::resource("/debug").route(web::route().to_async(debug_handler)))
-            .service(web::resource(&config.path).route(web::route().to(main_handler)))
+            .service(web::resource(&config.path).route(web::route().to_async(main_handler)))
             .default_service(
                 web::resource("").route(web::get().to(p404)).route(
                     web::route()
                         .guard(guard::Not(guard::Get()))
-                        .to(|| HttpResponse::MethodNotAllowed()),
+                        .to(HttpResponse::MethodNotAllowed),
                 ),
             )
     })
