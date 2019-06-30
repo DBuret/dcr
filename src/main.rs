@@ -229,6 +229,48 @@ fn main() -> io::Result<()> {
     .bind(bind_addr)?
     .start();
 
+/* 
+#[derive(Default)]
+struct ExtractorConfig {
+   config: String,
+}
+  
+impl FromRequest for YourExtractor {
+   type Error = Error;
+   type Future = Result<Self, Self::Error>;
+   type Config = ExtractorConfig;
+  
+   fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
+       let cfg = req.app_data::<ExtractorConfig>();
+       println!("config data?: {:?}", cfg.unwrap().role);
+       ...
+   }
+}
+  
+App::new().service(
+   resource("/route_with_config")
+       .data(ExtractorConfig {
+           config: "test".to_string(),
+       })
+       .route(post().to(handler_fn)),
+)
+
+
+Resource registration. 1.0 version uses generalized resource registration via .service() method.
+
+  App.new().service(
+      web::resource("/welcome")
+          .route(web::get().to(welcome))
+          .route(web::post().to(post_handler))
+
+
+let app = App::new().service(
+        web::scope("/{project_id}")
+            .service(web::resource("/path1").to(|| HttpResponse::Ok()))
+            .service(web::resource("/path2").to(|| HttpResponse::Ok()))
+            .service(web::resource("/path3").to(|| HttpResponse::MethodNotAllowed()))
+    );
+*/
 
     sys.run()
 }
