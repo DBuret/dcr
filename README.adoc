@@ -20,11 +20,10 @@ endif::[]
 
 DCR is a small standalone web app designed to help debugging the environment of orchestred containers, through a very small Rust app.
 
-CAUTION: this project is in very early stage. It is just a way for me to learn Rust. No input sanitization is made. Code is dirty.
+CAUTION: This project is in very early stage. It is just a way for me to learn Rust. No input sanitization is made. Code is dirty.
 
-TIP: If you feel this kind of tool can be usefull for you, please see https://github.com/DBuret/gse[GSE] that has the same purprose, with all features working (GSE is a golang version of DCR)
 
-.DCR will offers the following endpoints
+.DCR  offers the following endpoints
 * *displays its env* and the details of the http request it received
 ** usefull to understand what env and request your containers receive
 * *healthcheck* that can also be turned in ok or ko state through a simple http call
@@ -43,14 +42,13 @@ TIP: If you feel this kind of tool can be usefull for you, please see https://gi
 ** hostname
 ** path
 ** POST/PUT/... parameters ([red]#not yet#)
-* note that this endpoint will write a one line log to stdout
-* `/dcr` can be changed to another path via the `DCR_BASEPATH` pararameter. Other endpoints (version, healthcheck) will inherit this parameters.
+* `/dcr` can be changed to another path via the `DCR_BASEPATH` pararameter. Other endpoints (version, healthcheck, ...) will inherit this parameters.
 * each time this endpoint is reached, a log is written to stdout
 
  [2019-06-08T18:15:11Z INFO  dcr] HTTP/1.1 GET /dcr - 200 OK
 
 === Display version & stamp
-* `/DCR/version` endpoint can be queried through any HTTP method (GET, PUT, ...). It will answer an HTTP 200 status,with a single text line content made of program version and its stamp (if one has been specified, default stamp being empty) 
+* `/dcr/version` endpoint can be queried through any HTTP method (GET, PUT, ...). It will answer an HTTP 200 status,with a single text line content made of program version and its stamp (if one has been specified, default stamp being empty) 
 * the "stamp" allows us to test rolling, blue/green, or canary update with our container orchestrator: the same docker image (=same version) can be run with a given stamp (see DCR_STAMP bellow) given as parameter by the orchestrator, so we can differenciate to deployments, exemple:
 ** with no stamp, the answer will be `3.0`
 ** with DCR_STAMP="A",  the answer will be `3.0A`
@@ -60,20 +58,24 @@ TIP: If you feel this kind of tool can be usefull for you, please see https://gi
 
 
 === Healthcheck
-* `/DCR/health` is a endpoint to be used as healthcheck through an HTTP `GET` query. Answer will be 
+
+.query health status
+* `/dcr/health` is a endpoint to be used as healthcheck (readiness probe in kubernetes) through an HTTP `GET` query. Answer will be 
 ** when healtcheck is on: HTTP 200 status, content will be the text string _I'm alive_ 
 ** when healthcheck is off: HTTP 503 status, content will be the text string _I'm sick_ 
 ** no log will be written to stdout when reaching the healtcheck endpoint
-* healthcheck can be switched on/off (flip/flop) with an access with HTTP `POST` or `PUT` methods:
+
+.change health status
+* health can be switched ok/ko (flip/flop) with an access through HTTP `POST` or `PUT` methods:
 ** `curl -X POST http://127.0.0.1:28657/dcr/health`
 ** `curl -X PUT http://127.0.0.1:28657/dcr/health`
-** note that `POST` or `PUT` access to this endpoint writes log to stdout:
+** note that `POST` or `PUT` access to this endpoint writes log to stdout, e.g:
 
     [2019-06-08T18:11:33Z INFO  dcr] HTTP/1.1 POST /dcr/health - 200 OK - Healthcheck status toggled to: false
 
 === Logger
 
-*  `/DCR/logger` is an HTTP `POST` or `PUT` endpoint that will write to stdout the payload of the POST request
+*  `/dcr/logger` is an HTTP `POST` or `PUT` endpoint that will write to stdout the payload of the POST request
 * it is used to write data to the application logs (= stdout), to test your log aggregation/alarm system
 * answer: HTTP 200 status, content will be the text string _data ingested_ 
 
@@ -83,8 +85,8 @@ TIP: If you feel this kind of tool can be usefull for you, please see https://gi
 .answer
     data ingested
 
-.in the log of DCR - alpha version => b"...."
- [2019-06-10T17:46:45Z INFO  dcr] b"Text in Log"
+.in the log of DCR
+ [2019-06-10T17:46:45Z INFO  dcr] Text in Log
 
 == Parameters
 
@@ -146,7 +148,9 @@ point your web browser to http://localhost:28657/dcr
 $ sudo docker build -t dcr:0.2 .
 ----
 
-== Run locally with docker
+== Run with docker
+
+DCR is available on docker hub as https://hub.docker.com/r/davidburet/dcr[davidburet/dcr]
 
 === Using default config
 [source,console]
@@ -159,7 +163,7 @@ point your web browser to http://localhost:28657/dcr
 === using parameters
 [source,console]
 ----
-$ sudo docker run -e DCR_BASEPATH=/foo -e DCR_PORT=2000 -e DCR_STAMP=A -e DCR_HEALTHCHECK=false -p 2000:2000 dcr:0.2
+$ sudo docker run -e DCR_BASEPATH=/foo -e DCR_PORT=2000 -e DCR_STAMP=A -e DCR_HEALTHCHECK=false -p 2000:2000 dcr
 ----
 
 .Point your web browser to
