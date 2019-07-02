@@ -20,8 +20,7 @@ endif::[]
 
 DCR is a small standalone web app designed to help debugging the environment of orchestred containers, through a very small Rust app.
 
-CAUTION: This project is in very early stage. It is just a way for me to learn Rust. No input sanitization is made. Code is dirty.
-
+CAUTION: This project is also a way for me to learn Rust. Rust is safe but my code logic may not becsafe: No input sanitization is made. Code is dirty. I'm not using DCR with exposition on internet: please review its code before using it on internet.
 
 .DCR  offers the following endpoints
 * *displays its env* and the details of the http request it received
