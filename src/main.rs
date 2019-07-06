@@ -123,6 +123,17 @@ fn version_handler(stamp: web::Data<String>, req: HttpRequest) -> HttpResponse {
         .body(format!("{}{}", DCR_VERSION, stamp.get_ref()))
 }
 
+fn dns_handler(query: web::Path<String>) -> HttpResponse {
+    info!(
+        "dns: {:#?} ",
+        query
+    );
+
+    HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(format!("{:#?}", query))
+}
+
 /// logger endpoint: write payload to info log.
 fn logger_handler(body: web::Payload) -> impl Future<Item = HttpResponse, Error = Error> {
     body.map_err(Error::from)
@@ -216,6 +227,7 @@ fn main() -> io::Result<()> {
                     .route(web::post().to_async(logger_handler)),
             )
             .service(web::resource(&config.path_version).route(web::get().to(version_handler)))
+            .service(web::resource(&config.path_dns).route(web::get().to(dns_handler)))
             //.service(web::resource("/debug").route(web::route().to_async(debug_handler)))
             .service(web::resource(&config.path).route(web::route().to_async(main_handler)))
             .default_service(
@@ -283,6 +295,7 @@ struct Config {
     path_health: String,
     path_version: String,
     path_logger: String,
+        path_dns: String,
     port: String,
     stamp: String,
 }
@@ -313,6 +326,7 @@ impl Config {
         let path_health = format!("{}/health", path);
         let path_version = format!("{}/version", path);
         let path_logger = format!("{}/logger", path);
+        let path_dns = format!("{}/dns", path);
 
         HEALTH.store(healthcheck_on, Ordering::Relaxed);
 
@@ -323,6 +337,7 @@ impl Config {
             path_health,
             path_version,
             path_logger,
+            path_dns,
             port,
             stamp,
         })
