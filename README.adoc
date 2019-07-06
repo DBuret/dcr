@@ -190,3 +190,21 @@ $ sudo docker run -e DCR_BASEPATH=/foo -e DCR_PORT=2000 -e DCR_STAMP=A -e DCR_HE
 .Set healthcheck endpoint to "ok"
  $ curl -X PUT http://localhost:2000/foo/health
 
+== Changelog
+
+* 0.2.6 
+** added DNS resolver
+** favicon impl
+* 0.2.5
+** not published
+* 0.2.4
+** markdown readme for docker that does not understand asciidoc
+* 0.2.3
+** main endpoint display its payload form PUT/POST requests
+* 0.2.1
+** cleaner logger output
+** cleaner version output
+* 0.2
+** first working docker image
+* 0.1
+** first published version: main endpint, version, and healthcheck
