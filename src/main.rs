@@ -2,6 +2,7 @@
 
 #[macro_use]
 extern crate log;
+extern crate trust_dns_resolver;
 
 /* #[macro_use]
 extern crate actix_web; */
@@ -80,6 +81,10 @@ fn main_handler(
         })
 }
 
+///
+///
+///
+use actix_files as fs;
 
 fn health_handler(_req: HttpRequest) -> HttpResponse {
 
@@ -125,13 +130,22 @@ fn version_handler(stamp: web::Data<String>, req: HttpRequest) -> HttpResponse {
         .body(format!("{}{}", DCR_VERSION, stamp.get_ref()))
 }
 
-fn dns_handler(query: web::Path<String>) -> HttpResponse {
 
-    info!("dns: {:#?} ", query);
+//use std::net::IpAddr;
+use std::net::ToSocketAddrs;
+
+/// dns endpoint: query dns
+fn dns_handler(query: web::Path<String>) -> HttpResponse {
+    // simply create a socker address to check if we resolve
+    let answer = match format!("{}:80", query).to_socket_addrs() {
+        Ok(val) => format!("{:?} => {:?}", query, val),
+        Err(e) => format!("{:?} => error {:?}", query, e),
+    };
+
 
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body(format!("{:#?}", query))
+        .body(answer)
 }
 
 /// logger endpoint: write payload to info log.
@@ -216,6 +230,7 @@ fn main() -> io::Result<()> {
             .register_data(web::Data::new(config.stamp.clone()))
             .wrap(middleware::Logger::default())
             .service(
+                // endpoints under BASE_PATH
                 web::scope(&config.path)
                     .service(
                         web::resource("/health")
@@ -232,7 +247,11 @@ fn main() -> io::Result<()> {
                     .route("/dns/{host}", web::get().to(dns_handler))
                     .default_service(web::resource("").route(web::get().to_async(main_handler))),
             )
-
+            // static files
+            .service(
+                // static files
+                fs::Files::new("/", "./static").index_file("index.html"),
+            )
             .default_service(
                 web::resource("").route(web::get().to(p404)).route(
                     web::route()
@@ -305,11 +324,6 @@ impl Config {
             Ok(_val) => false,
             Err(_e) => true,
         };
-
-        /* let path_health = format!("{}/health", path);
-        let path_version = format!("{}/version", path);
-        let path_logger = format!("{}/logger", path);
-        let path_dns = format!("{}/dns/{host}", path); */
 
         HEALTH.store(healthcheck_on, Ordering::Relaxed);
 
