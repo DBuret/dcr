@@ -10,6 +10,8 @@ DCR offers the following endpoints
     - usefull to test your log gathering system.
 - **version display** with a stamp
     - usefull to follow rolling updates
+- **DNS (name to IP) resolver** 
+    - usefull to check what your containers are able to resolve
 
 more details (configuration options) are available at https://github.com/DBuret/dcr
 

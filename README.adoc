@@ -31,6 +31,8 @@ CAUTION: This project is also a way for me to learn Rust. Rust is safe but my co
 ** usefull to test your log gathering system
 * *version display* 
 ** usefull to follow rolling/blue-green/canary updates: you can 'stamp' your container version through a env var
+* *DNS (name to IP) resolver* 
+** usefull to check what your containers are able to resolve
 
 == Endpoints
 
@@ -86,6 +88,21 @@ CAUTION: This project is also a way for me to learn Rust. Rust is safe but my co
 
 .in the log of DCR
  [2019-06-10T17:46:45Z INFO  dcr] Text in Log
+
+=== DNS (name to IP) resolver
+*  `/dcr/dns/hosntame` is an HTTP `GET` endpoint that will resolve the given hostname into an IP, using the system DNS found in the container
+* answer: HTTP 200 status, content will be the text string _data ingested_ 
+
+.Exemple
+The request http://localhost:127.0.0.1:28657/dcr/dns/www.orange.fr will answer
+
+ 2a01:c9c0:a3:8::70
+ 2a01:c9c0:b3:3000::73
+ 193.252.122.73
+ 193.252.148.70
+
+WARNING: output is HTML, not simple text or JSON, I'll have to improve that
+
 
 == Parameters
 
