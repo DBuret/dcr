@@ -25,7 +25,9 @@ use std::sync::Arc;
 use std::{env, io, process, str};
 
 
-const DCR_VERSION: &str = "0.2.3";
+//const DCR_VERSION: &str = "0.2.3";
+const DCR_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 static HEALTH: AtomicBool = AtomicBool::new(true);
 
 fn main_handler(
@@ -124,10 +126,8 @@ fn version_handler(stamp: web::Data<String>, req: HttpRequest) -> HttpResponse {
 }
 
 fn dns_handler(query: web::Path<String>) -> HttpResponse {
-    info!(
-        "dns: {:#?} ",
-        query
-    );
+
+    info!("dns: {:#?} ", query);
 
     HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
@@ -216,20 +216,23 @@ fn main() -> io::Result<()> {
             .register_data(web::Data::new(config.stamp.clone()))
             .wrap(middleware::Logger::default())
             .service(
-                web::resource(&config.path_health)
-                    .route(web::get().to(health_handler))
-                    .route(web::put().to(health_toggle_handler))
-                    .route(web::post().to(health_toggle_handler)),
+                web::scope(&config.path)
+                    .service(
+                        web::resource("/health")
+                            .route(web::get().to(health_handler))
+                            .route(web::put().to(health_toggle_handler))
+                            .route(web::post().to(health_toggle_handler)),
+                    )
+                    .service(
+                        web::resource("/logger")
+                            .route(web::put().to_async(logger_handler))
+                            .route(web::post().to_async(logger_handler)),
+                    )
+                    .service(web::resource("/version").route(web::get().to(version_handler)))
+                    .route("/dns/{host}", web::get().to(dns_handler))
+                    .default_service(web::resource("").route(web::get().to_async(main_handler))),
             )
-            .service(
-                web::resource(&config.path_logger)
-                    .route(web::put().to_async(logger_handler))
-                    .route(web::post().to_async(logger_handler)),
-            )
-            .service(web::resource(&config.path_version).route(web::get().to(version_handler)))
-            .service(web::resource(&config.path_dns).route(web::get().to(dns_handler)))
-            //.service(web::resource("/debug").route(web::route().to_async(debug_handler)))
-            .service(web::resource(&config.path).route(web::route().to_async(main_handler)))
+
             .default_service(
                 web::resource("").route(web::get().to(p404)).route(
                     web::route()
@@ -237,52 +240,36 @@ fn main() -> io::Result<()> {
                         .to(HttpResponse::MethodNotAllowed),
                 ),
             )
+
     })
     .bind(bind_addr)?
     .start();
 
-/* 
-#[derive(Default)]
-struct ExtractorConfig {
-   config: String,
-}
-  
-impl FromRequest for YourExtractor {
-   type Error = Error;
-   type Future = Result<Self, Self::Error>;
-   type Config = ExtractorConfig;
-  
-   fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-       let cfg = req.app_data::<ExtractorConfig>();
-       println!("config data?: {:?}", cfg.unwrap().role);
-       ...
-   }
-}
-  
-App::new().service(
-   resource("/route_with_config")
-       .data(ExtractorConfig {
-           config: "test".to_string(),
-       })
-       .route(post().to(handler_fn)),
-)
+    /*
+     #[derive(Default)]
+     struct ExtractorConfig {
+        config: String,
+     }
 
+     impl FromRequest for YourExtractor {
+        type Error = Error;
+        type Future = Result<Self, Self::Error>;
+        type Config = ExtractorConfig;
+        fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
+            let cfg = req.app_data::<ExtractorConfig>();
+            println!("config data?: {:?}", cfg.unwrap().role);
+            ...
+        }
+     }
 
-Resource registration. 1.0 version uses generalized resource registration via .service() method.
-
-  App.new().service(
-      web::resource("/welcome")
-          .route(web::get().to(welcome))
-          .route(web::post().to(post_handler))
-
-
-let app = App::new().service(
-        web::scope("/{project_id}")
-            .service(web::resource("/path1").to(|| HttpResponse::Ok()))
-            .service(web::resource("/path2").to(|| HttpResponse::Ok()))
-            .service(web::resource("/path3").to(|| HttpResponse::MethodNotAllowed()))
-    );
-*/
+     App::new().service(
+        resource("/route_with_config")
+            .data(ExtractorConfig {
+                config: "test".to_string(),
+            })
+            .route(post().to(handler_fn)),
+     )
+    */
 
     sys.run()
 }
@@ -292,10 +279,6 @@ struct Config {
     healthcheck_on: bool,
     logger_on: bool,
     path: String,
-    path_health: String,
-    path_version: String,
-    path_logger: String,
-        path_dns: String,
     port: String,
     stamp: String,
 }
@@ -323,10 +306,10 @@ impl Config {
             Err(_e) => true,
         };
 
-        let path_health = format!("{}/health", path);
+        /* let path_health = format!("{}/health", path);
         let path_version = format!("{}/version", path);
         let path_logger = format!("{}/logger", path);
-        let path_dns = format!("{}/dns", path);
+        let path_dns = format!("{}/dns/{host}", path); */
 
         HEALTH.store(healthcheck_on, Ordering::Relaxed);
 
@@ -334,10 +317,6 @@ impl Config {
             healthcheck_on,
             logger_on,
             path,
-            path_health,
-            path_version,
-            path_logger,
-            path_dns,
             port,
             stamp,
         })
