@@ -1,0 +1,118 @@
+<html>
+
+<head>
+    <style type="text/css">
+        h1 {
+            font-family: Calibri, Sans-Serif;
+        }
+
+        h2 {
+            font-family: Calibri, Sans-Serif;
+            color: darkblue;
+        }
+
+        code {
+            background: #dddddd;
+            display: block
+        }
+    </style>
+    <title>DCR</title>
+</head>
+
+<body>
+    <h1>HTTP request</h1>
+    <h2>Method</h2>
+    <textarea rows="3" cols=132>
+Method=POST
+URI=/dcr
+Proto=HTTP/1.1
+    </textarea>
+    </code>
+
+
+    <h2>HTTP Headers received</h2>
+    <textarea rows="5" cols=132>
+accept: &quot;*/*&quot;
+expect: &quot;100-continue&quot;
+content-length: &quot;7943&quot;
+host: &quot;127.0.0.1:28657&quot;
+user-agent: &quot;curl/7.65.1&quot;
+content-type: &quot;application/x-www-form-urlencoded&quot;
+
+    </textarea>
+
+    <h2>Body of the Request (for methods PUT, POST, ...)</h2>
+    <textarea rows="5" cols=132>
+#![warn(clippy::all, clippy::nursery)]#[macro_use]extern crate log;/* #[macro_use]extern crate actix_web; *//*#[macro_use]extern crate env_logger;*/#[macro_use]extern crate serde_json;use actix_web::http::StatusCode;use actix_web::{    guard, middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer, Result,};use futures::{Future, Stream};use handlebars::Handlebars;//use serde::Deserialize;use std::sync::atomic::{AtomicBool, Ordering};use std::sync::Arc;use std::{env, io, process, str};const DCR_VERSION: &amp;str = &quot;0.2.2&quot;;static HEALTH: AtomicBool = AtomicBool::new(true);// payload display not implementedfn main_handler(    body: web::Payload,    hb: web::Data&lt;Arc&lt;Handlebars&gt;&gt;,    req: HttpRequest,) -&gt; impl Future&lt;Item = HttpResponse, Error = Error&gt; {    info!(        &quot;{:#?} {} {} - 200 OK&quot;,        req.version(),        req.method(),        req.uri()    );    let mut header_content = String::new();    for (key, value) in req.headers() {        header_content.push_str(&amp;format!(&quot;{}: {:#?}\n&quot;, key, value));    }    let mut env_content = String::new();    for (key, value) in env::vars() {        env_content.push_str(&amp;format!(&quot;{}: {}\n&quot;, key, value));    }    let mut input = String::new();    body.map_err(Error::from)        .fold(web::BytesMut::new(), move |mut body, chunk| {            body.extend_from_slice(&amp;chunk);            Ok::&lt;_, Error&gt;(body)        })        .and_then(move |body| {            let s = match str::from_utf8(&amp;body) {                Ok(v) =&gt; v,                Err(_e) =&gt; &quot;output to log refused, Invalid UTF-8 sequence&quot;,            };            debug!(&quot;{}&quot;, s);            let data = json!({                &quot;version&quot;: format!(&quot;{:?}&quot;,req.version()),                &quot;method&quot;: format!(&quot;{:?}&quot;,req.method()),                &quot;uri&quot; : format!(&quot;{:?}&quot;,req.uri()),                &quot;header&quot; : header_content,                &quot;input&quot; : s,                &quot;env&quot; : env_content            });            let page = hb.render(&quot;index&quot;, &amp;data).unwrap();            Ok(HttpResponse::build(StatusCode::OK)                .content_type(&quot;text/html; charset=utf-8&quot;)                .body(page))        })}fn health_handler(_req: HttpRequest) -&gt; HttpResponse {    if HEALTH.load(Ordering::Relaxed) {        HttpResponse::build(StatusCode::OK)            .content_type(&quot;text/html; charset=utf-8&quot;)            .body(&quot;OK&quot;)    } else {        HttpResponse::build(StatusCode::SERVICE_UNAVAILABLE)            .content_type(&quot;text/html; charset=utf-8&quot;)            .body(&quot;KO&quot;)    }}fn health_toggle_handler(req: HttpRequest) -&gt; HttpResponse {    let hc = !HEALTH.load(Ordering::Relaxed);    HEALTH.store(hc, Ordering::Relaxed);    info!(        &quot;{:#?} {} {} - 200 OK - Healthcheck status toggled to: {} &quot;,        req.version(),        req.method(),        req.uri(),        hc    );    HttpResponse::build(StatusCode::OK)        .content_type(&quot;text/html; charset=utf-8&quot;)        .body(format!(&quot;healthcheck toggled to {} state&quot;, hc))}//fn version_handler(stamp: web::Data&lt;String&gt;, req: HttpRequest) -&gt; HttpResponse {    info!(        &quot;{:#?} {} {} - 200 OK&quot;,        req.version(),        req.method(),        req.uri()    );    HttpResponse::build(StatusCode::OK)        .content_type(&quot;text/html; charset=utf-8&quot;)        .body(format!(&quot;{}{}&quot;, DCR_VERSION, stamp.get_ref()))}/// logger endpoint: write payload to info log.fn logger_handler(body: web::Payload) -&gt; impl Future&lt;Item = HttpResponse, Error = Error&gt; {    body.map_err(Error::from)        .fold(web::BytesMut::new(), move |mut body, chunk| {            body.extend_from_slice(&amp;chunk);            Ok::&lt;_, Error&gt;(body)        })        .and_then(|body| {            let s = match str::from_utf8(&amp;body) {                Ok(v) =&gt; v,                Err(_e) =&gt; &quot;output to log refused, Invalid UTF-8 sequence&quot;,            };            info!(&quot;{}&quot;, s);            Ok(HttpResponse::build(StatusCode::OK)                .content_type(&quot;text/html; charset=utf-8&quot;)                .body(&quot;data ingested, check the logs.&quot;))        })}fn p404(req: HttpRequest) -&gt; HttpResponse {    info!(        &quot;{:#?} {} {} - 404 NOT FOUND&quot;,        req.version(),        req.method(),        req.uri()    );    HttpResponse::build(StatusCode::NOT_FOUND)        .content_type(&quot;text/html; charset=utf-8&quot;)        .body(&quot;Oops, you requested an unknown location.\n&quot;)}fn main() -&gt; io::Result&lt;()&gt; {    // logger init    env::set_var(&quot;RUST_LOG&quot;, &quot;dcr=debug&quot;);    env_logger::init();    // parse env    let config = Config::new().unwrap_or_else(|err| {        info!(&quot;Problem parsing environment: {}&quot;, err);        process::exit(1);    });    let bind_addr = format!(&quot;0.0.0.0:{}&quot;, config.port);    info!(        &quot;Version {}{} on http://{}{}. Healthcheck is {} and logger endpoint is {}&quot;,        DCR_VERSION,        config.stamp,        bind_addr,        config.path,        if HEALTH.load(Ordering::Relaxed) {            &quot;OK&quot;        } else {            &quot;KO&quot;        },        if config.logger_on {            &quot;active&quot;        } else {            &quot;not active&quot;        },    );    // create actix system    let sys = actix_rt::System::new(&quot;dcr&quot;);    // configure HTML template engine    let mut handlebars = Handlebars::new();    handlebars        .register_templates_directory(&quot;.html&quot;, &quot;./static/templates&quot;)        .unwrap();    let handlebars_ref = web::Data::new(Arc::new(handlebars));    // server    HttpServer::new(move || {        App::new()            .register_data(handlebars_ref.clone())            .register_data(web::Data::new(config.stamp.clone()))            .wrap(middleware::Logger::default())            .service(                web::resource(&amp;config.path_health)                    .route(web::get().to(health_handler))                    .route(web::put().to(health_toggle_handler))                    .route(web::post().to(health_toggle_handler)),            )            .service(                web::resource(&amp;config.path_logger)                    .route(web::put().to_async(logger_handler))                    .route(web::post().to_async(logger_handler)),            )            .service(web::resource(&amp;config.path_version).route(web::get().to(version_handler)))            //.service(web::resource(&quot;/debug&quot;).route(web::route().to_async(debug_handler)))            .service(web::resource(&amp;config.path).route(web::route().to_async(main_handler)))            .default_service(                web::resource(&quot;&quot;).route(web::get().to(p404)).route(                    web::route()                        .guard(guard::Not(guard::Get()))                        .to(HttpResponse::MethodNotAllowed),                ),            )    })    .bind(bind_addr)?    .start();    sys.run()}#[derive(Clone)]struct Config {    healthcheck_on: bool,    logger_on: bool,    path: String,    path_health: String,    path_version: String,    path_logger: String,    port: String,    stamp: String,}impl Config {    fn new() -&gt; Result&lt;Config, &amp;'static str&gt; {        let path = match env::var(&quot;DCR_BASEPATH&quot;) {            Ok(val) =&gt; val,            Err(_e) =&gt; String::from(&quot;/dcr&quot;),        };        let port = match env::var(&quot;DCR_PORT&quot;) {            Ok(val) =&gt; val,            Err(_e) =&gt; String::from(&quot;28657&quot;),        };        let stamp = match env::var(&quot;DCR_STAMP&quot;) {            Ok(val) =&gt; val,            Err(_e) =&gt; String::from(&quot;&quot;),        };        let healthcheck_on = match env::var(&quot;DCR_HEALTHCHECK&quot;) {            Ok(_val) =&gt; false,            Err(_e) =&gt; true,        };        let logger_on = match env::var(&quot;DCR_LOGGER&quot;) {            Ok(_val) =&gt; false,            Err(_e) =&gt; true,        };        let path_health = format!(&quot;{}/health&quot;, path);        let path_version = format!(&quot;{}/version&quot;, path);        let path_logger = format!(&quot;{}/logger&quot;, path);        HEALTH.store(healthcheck_on, Ordering::Relaxed);        Ok(Config {            healthcheck_on,            logger_on,            path,            path_health,            path_version,            path_logger,            port,            stamp,        })    }}
+    </textarea>
+
+    <h1>Environment</h1>
+    <textarea rows="5" cols=132>
+ALLUSERSPROFILE: C:\ProgramData
+APPDATA: C:\Users\david\AppData\Roaming
+COMMONPROGRAMFILES: C:\Program Files\Common Files
+COMPLUS_FodPath: c:\no-fod.exe
+COMPUTERNAME: PC-2012
+COMSPEC: C:\WINDOWS\system32\cmd.exe
+CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.1
+CUDA_PATH_V10_1: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.1
+ChocolateyInstall: C:\ProgramData\chocolatey
+ChocolateyLastPathUpdate: 131974884170532476
+CommonProgramFiles(x86): C:\Program Files (x86)\Common Files
+CommonProgramW6432: C:\Program Files\Common Files
+DriverData: C:\Windows\System32\Drivers\DriverData
+EXEPATH: C:\Program Files\Git\bin
+FPS_BROWSER_APP_PROFILE_STRING: Internet Explorer
+FPS_BROWSER_USER_PROFILE_STRING: Default
+GOPATH: C:/users/david/go
+GOROOT: C:\Go\
+HOME: C:\Users\david
+HOMEDRIVE: C:
+HOMEPATH: \Users\david
+LANG: fr_FR.UTF-8
+LOCALAPPDATA: C:\Users\david\AppData\Local
+LOGONSERVER: \\PC-2012
+MSYSTEM: MINGW64
+NUMBER_OF_PROCESSORS: 4
+NVCUDASAMPLES10_1_ROOT: C:\ProgramData\NVIDIA Corporation\CUDA Samples\v10.1
+NVCUDASAMPLES_ROOT: C:\ProgramData\NVIDIA Corporation\CUDA Samples\v10.1
+NVTOOLSEXT_PATH: C:\Program Files\NVIDIA Corporation\NvToolsExt\
+OS: Windows_NT
+OneDrive: C:\Users\david\OneDrive
+PATH: C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\david\bin;C:\ProgramData\DockerDesktop\version-bin;C:\Program Files\Docker\Docker\Resources\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.1\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.1\libnvvp;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\Program Files (x86)\Intel\iCLS Client;C:\Program Files\Intel\iCLS Client;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0;C:\WINDOWS\System32\OpenSSH;C:\Go\bin;C:\HashiCorp\Vagrant\bin;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files\Crucial\Crucial Storage Executive;C:\Program Files (x86)\Common Files\Acronis\VirtualFile;C:\Program Files (x86)\Common Files\Acronis\VirtualFile64;C:\Program Files (x86)\Common Files\Acronis\SnapAPI;C:\Program Files\NVIDIA Corporation\NVIDIA NvDLISR;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0;C:\WINDOWS\System32\OpenSSH;C:\Program Files\Microsoft VS Code\bin;C:\ProgramData\chocolatey\bin;C:\Program Files\NVIDIA Corporation\Nsight Compute 2019.1;C:\Program Files\dotnet;C:\Program Files\Microsoft SQL Server\130\Tools\Binn;C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn;C:\Program Files\Microsoft VS Code Insiders\bin;C:\Program Files\Git\cmd;C:\Users\david\.cargo\bin;C:\Ruby25-x64\bin;C:\Users\david\AppData\Local\Microsoft\WindowsApps;C:\Program Files\Microsoft VS Code\bin;C:\Program Files (x86)\Graphviz2.38\bin
+PATHEXT: .COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC;.RB;.RBW
+PLINK_PROTOCOL: ssh
+PROCESSOR_ARCHITECTURE: AMD64
+PROCESSOR_IDENTIFIER: Intel64 Family 6 Model 58 Stepping 9, GenuineIntel
+PROCESSOR_LEVEL: 6
+PROCESSOR_REVISION: 3a09
+PROGRAMFILES: C:\Program Files
+PS1: \[\033]0;$TITLEPREFIX:$PWD\007\]\n\[\033[32m\]\u@\h \[\033[35m\]$MSYSTEM \[\033[33m\]\w\[\033[36m\]`__git_ps1`\[\033[0m\]\n$ 
+PSModulePath: C:\Program Files\WindowsPowerShell\Modules;C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules
+PUBLIC: C:\Users\Public
+PWD: C:/Users/david/rust/dcr
+ProgramData: C:\ProgramData
+ProgramFiles(x86): C:\Program Files (x86)
+ProgramW6432: C:\Program Files
+RUBYOPT: -Eutf-8
+RUST_LOG: dcr=debug
+SESSIONNAME: Console
+SHLVL: 1
+SYSTEMDRIVE: C:
+SYSTEMROOT: C:\WINDOWS
+TEMP: C:\Users\david\AppData\Local\Temp
+TERM: cygwin
+TERM_PROGRAM: vscode
+TERM_PROGRAM_VERSION: 1.35.0
+TMP: C:\Users\david\AppData\Local\Temp
+USERDOMAIN: PC-2012
+USERDOMAIN_ROAMINGPROFILE: PC-2012
+USERNAME: david
+USERPROFILE: C:\Users\david
+WINDIR: C:\WINDOWS
+_: target/debug/dcr.exe
+
+    </textarea>
+</body>
+
+</html>

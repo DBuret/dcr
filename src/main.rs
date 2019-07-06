@@ -2,13 +2,6 @@
 
 #[macro_use]
 extern crate log;
-extern crate trust_dns_resolver;
-
-/* #[macro_use]
-extern crate actix_web; */
-
-/*#[macro_use]
-extern crate env_logger;*/
 
 #[macro_use]
 extern crate serde_json;
@@ -81,9 +74,7 @@ fn main_handler(
         })
 }
 
-///
-///
-///
+
 use actix_files as fs;
 
 fn health_handler(_req: HttpRequest) -> HttpResponse {
@@ -137,8 +128,12 @@ use std::net::ToSocketAddrs;
 /// dns endpoint: query dns
 fn dns_handler(query: web::Path<String>) -> HttpResponse {
     // simply create a socker address to check if we resolve
+
     let answer = match format!("{}:80", query).to_socket_addrs() {
-        Ok(val) => format!("{:?} => {:?}", query, val),
+        //        Ok(val) => format!("{:?} => {:?}", query, val),
+        Ok(val) => val.fold("".to_string(), |addrs, addr| {
+            format!("{}<br>{}", addrs, addr.ip())
+        }),
         Err(e) => format!("{:?} => error {:?}", query, e),
     };
 
@@ -263,32 +258,6 @@ fn main() -> io::Result<()> {
     })
     .bind(bind_addr)?
     .start();
-
-    /*
-     #[derive(Default)]
-     struct ExtractorConfig {
-        config: String,
-     }
-
-     impl FromRequest for YourExtractor {
-        type Error = Error;
-        type Future = Result<Self, Self::Error>;
-        type Config = ExtractorConfig;
-        fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-            let cfg = req.app_data::<ExtractorConfig>();
-            println!("config data?: {:?}", cfg.unwrap().role);
-            ...
-        }
-     }
-
-     App::new().service(
-        resource("/route_with_config")
-            .data(ExtractorConfig {
-                config: "test".to_string(),
-            })
-            .route(post().to(handler_fn)),
-     )
-    */
 
     sys.run()
 }
