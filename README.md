@@ -6,6 +6,8 @@ DCR offers the following endpoints
     - usefull to understand what env and request your containers receive
 - **healthcheck** that can also be turned in ok or ko state through a simple http call
     - usefull to play with your container orchestrator (kubernetes, nomad...) routing system.
+- **liveness probe** that can also be turned in ok or ko state through a simple http call
+    - usefull to play with Kubernetes
 - **logger** to output what you want on the log output
     - usefull to test your log gathering system.
 - **version display** with a stamp
