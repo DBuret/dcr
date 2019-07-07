@@ -13,6 +13,6 @@ DCR offers the following endpoints
 - **DNS (name to IP) resolver** 
     - usefull to check what your containers are able to resolve
 
-more details (configuration options) are available at https://github.com/DBuret/dcr
+more details (configuration options) are available [in the asciidoc readme](https://github.com/DBuret/dcr/README.adoc)
 
 It's a personnal project aimed at discovering Rust, so it is not polished.
