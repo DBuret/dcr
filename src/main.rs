@@ -23,6 +23,38 @@ use std::{env, io, process, str};
 const DCR_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 static HEALTH: AtomicBool = AtomicBool::new(true);
+static LIVE: AtomicBool = AtomicBool::new(true);
+
+fn live_handler(_req: HttpRequest) -> HttpResponse {
+
+    if LIVE.load(Ordering::Relaxed) {
+        HttpResponse::build(StatusCode::OK)
+            .content_type("text/html; charset=utf-8")
+            .body("OK")
+    } else {
+        HttpResponse::build(StatusCode::SERVICE_UNAVAILABLE)
+            .content_type("text/html; charset=utf-8")
+            .body("KO")
+    }
+}
+
+
+fn live_toggle_handler(req: HttpRequest) -> HttpResponse {
+
+    let hc = !LIVE.load(Ordering::Relaxed);
+    LIVE.store(hc, Ordering::Relaxed);
+    info!(
+        "{:#?} {} {} - 200 OK - liveness status toggled to: {} ",
+        req.version(),
+        req.method(),
+        req.uri(),
+        hc
+    );
+    HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(format!("healthcheck toggled to {} state", hc))
+}
+
 
 fn main_handler(
     body: web::Payload,
@@ -234,6 +266,12 @@ fn main() -> io::Result<()> {
                             .route(web::post().to(health_toggle_handler)),
                     )
                     .service(
+                        web::resource("/live")
+                            .route(web::get().to(live_handler))
+                            .route(web::put().to(live_toggle_handler))
+                            .route(web::post().to(live_toggle_handler)),
+                    )
+                    .service(
                         web::resource("/logger")
                             .route(web::put().to_async(logger_handler))
                             .route(web::post().to_async(logger_handler)),
@@ -295,6 +333,7 @@ impl Config {
         };
 
         HEALTH.store(healthcheck_on, Ordering::Relaxed);
+        LIVE.store(true, Ordering::Relaxed);
 
         Ok(Config {
             healthcheck_on,

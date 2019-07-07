@@ -1,7 +1,8 @@
 = DCR: "Debugging Containers with Rust" micro HTTP service
 :author: David Buret
-:source-highlighter: rouge
-:pygments-style: github
+:page-layout: base
+:idprefix:
+:idseparator: -
 :icons: font
 :sectnums:
 :toclevels: 4
@@ -14,6 +15,7 @@ ifdef::env-github[]
 :important-caption: :heavy_exclamation_mark:
 :caution-caption: :fire:
 :warning-caption: :warning:
+:idprefix: user-content-
 endif::[]
 
 == Introduction 
@@ -27,6 +29,8 @@ CAUTION: This project is also a way for me to learn Rust. Rust is safe but my co
 ** usefull to understand what env and request your containers receive
 * *healthcheck* that can also be turned in ok or ko state through a simple http call
 ** usefull to play with your container orchestrator (kubernetes, nomad...) routing system.
+* **liveness probe** that can also be turned in ok or ko state through a simple http call
+** usefull to play with Kubernetes
 * *logger* to output what you want on the log output
 ** usefull to test your log gathering system
 * *version display* 
@@ -62,8 +66,8 @@ CAUTION: This project is also a way for me to learn Rust. Rust is safe but my co
 
 .query health status
 * `/dcr/health` is a endpoint to be used as healthcheck (readiness probe in kubernetes) through an HTTP `GET` query. Answer will be 
-** when healtcheck is on: HTTP 200 status, content will be the text string _I'm alive_ 
-** when healthcheck is off: HTTP 503 status, content will be the text string _I'm sick_ 
+** when healtcheck is on: HTTP 200 status, content will be the text string _OK_ 
+** when healthcheck is off: HTTP 503 status, content will be the text string _KO_ 
 ** no log will be written to stdout when reaching the healtcheck endpoint
 
 .change health status
@@ -73,6 +77,22 @@ CAUTION: This project is also a way for me to learn Rust. Rust is safe but my co
 ** note that `POST` or `PUT` access to this endpoint writes log to stdout, e.g:
 
     [2019-06-08T18:11:33Z INFO  dcr] HTTP/1.1 POST /dcr/health - 200 OK - Healthcheck status toggled to: false
+
+=== Liveness probe
+
+.query liveness status
+* `/dcr/live` is a endpoint to be used as liveness probe in kubernetes through an HTTP `GET` query. Answer will be 
+** when liveness is on: HTTP 200 status, content will be the text string _OK_ 
+** when liveness is off: HTTP 503 status, content will be the text string _KO_ 
+** no log will be written to stdout when reaching the healtcheck endpoint
+
+.change liveness status
+* liveness can be switched ok/ko (flip/flop) with an access through HTTP `POST` or `PUT` methods:
+** `curl -X POST http://127.0.0.1:28657/dcr/live`
+** `curl -X PUT http://127.0.0.1:28657/dcr/live`
+** note that `POST` or `PUT` access to this endpoint writes log to stdout, e.g:
+
+    [2019-06-08T18:11:33Z INFO  dcr] HTTP/1.1 POST /dcr/live - 200 OK - liveness status toggled to: false
 
 === Logger
 
